@@ -1,0 +1,10 @@
+#!/bin/bash
+source "${0%/*}/../lib/zrancid.env" || exit 2
+PROGNAME=${0##*/}
+days=${1:-30}; shift
+function fatal() { echo "FATAL: $PROGNAME: $*" >&2; exit 2; }
+[[ -z $LOGDIR ]] && fatal 'Bad env! LOGDIR not set'
+[[ -d $LOGDIR/. ]] || fatal 'LOGDIR is not a directory!'
+[[ -z $days || -n ${days//[0-9]} ]] && fatal "Usage: $PROGNAME OLDER-THAN-DAYS"
+cd "$LOGDIR/" # avoid warning when find cannot access cwd
+exec find "$LOGDIR/" -mindepth 1 -maxdepth 1 -type f -mtime "+$days" -delete

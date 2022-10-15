@@ -1,0 +1,54 @@
+#!/bin/bash
+
+PROGNAME=${0##*/}
+OIFS=$IFS
+set -o pipefail
+
+function nagios_exit_usage() {
+    echo "\
+Usage: $PROGNAME [OPTION...] -e ENTITY
+Nagios plugin to check for missing (z)RANCiD devices
+
+Options:
+  -e, --entity NAME         Entity name
+  -h, --help                Display this help
+"
+    exit 3
+}
+
+ENTITY=
+while (( $# > 0 )); do
+    case "$1" in
+        -e|--entity) ENTITY=$2; shift ;;
+        *) nagios_exit_usage ;;
+    esac
+    shift
+done
+
+[[ -z $ENTITY ]] && nagios_exit_usage
+
+IFS=$'\n'
+missing=($(
+    zrancid-auto-yana -e "$ENTITY" 2>&1 >/dev/null |
+        sed -nr -e 's@^WARNING: .*, name=(.+) => SKIP.*@\1@p' \
+            -e 's@^INFO: .* \x27zrancid-add\x27 \x27([^\x27]+)\x27.*@\1@p'
+))
+ret=$?
+IFS=$OIFS
+
+if (( ret != 0 )); then
+    echo "UNKNOWN: Command zrancid-auto-yana failed status $ret"
+    exit 3
+fi
+
+if (( ${#missing[@]} > 0 )); then
+    list="${missing[@]/%/,}"
+    list=${list:0:${#list}-1}
+    (( ${#list} > 255 )) && list="${list:0:255}..."
+    (( ${#missing[@]} > 1 )) && s=s || s=
+    echo "CRITICAL: ${#missing[@]} missing device$s: $list|missing=${#missing[@]}"
+    exit 2
+fi
+
+echo "OK: No missing device found|missing=0"
+exit 0

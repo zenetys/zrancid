@@ -1,0 +1,91 @@
+#!/bin/bash
+
+PROGNAME=${0##*/}
+OIFS=$IFS
+set -o pipefail
+set -f
+
+BASEURL=$YANA_BASEURL
+ENTITIES=()
+WITH_ID=0
+SEPARATOR=$'\t'
+TIMEOUT=${YANA_TIMEOUT:-5}
+VERBOSE=0
+
+function exit_usage() {
+    local status=${1:-0}
+    [[ $status != 0 ]] && exec >&2
+    echo "Usage: $PROGNAME [OPTION]...
+List devices from a YaNA backend server
+
+Options:
+  -u, --url         Base URL of the karoline server
+  -e, --entity      Focus on a specific entity, may be repeated
+  -s, --separator   Output field separator, default tabulation
+  -t, --timeout     Query timeout in seconds, curl --max-time option
+  -F, --filter      Filter output lines with grep -E
+  -i, --with-id     Add device ID in first column
+  -v, --verbose     Increase verbosity, may be repeated
+  -h, --help        Display this help
+"
+    exit "$status"
+}
+
+shopt -s extglob
+while (( $# > 0 )); do
+    case "$1" in
+        -u|--url) BASEURL=$2; shift ;;
+        -e|--entity) ENTITIES+=( "$2" ); shift ;;
+        -s|--separator) SEPARATOR=$2; shift ;;
+        -t|--timeout) TIMEOUT=$2; shift ;;
+        -F|--filter) FILTER=$2; shift ;;
+        -i|--with-id) WITH_ID=1 ;;
+        -+(v)) (( VERBOSE += ${#1}-1 )) ;;
+        --verbose) (( VERBOSE++ )) ;;
+        -h|--help) exit_usage 0 ;;
+        *) exit_usage 1 ;;
+    esac
+    shift
+done
+shopt -u extglob
+
+function _curl() {
+    curl -m "$TIMEOUT" -f -sS "$@"
+}
+
+function fatal() { echo "FATAL: $PROGNAME: $*" >&2; exit 2; }
+function error() { echo "ERROR: $PROGNAME: $*" >&2; }
+function info() { echo "INFO: $PROGNAME: $*" >&2; }
+function verbose() { (( VERBOSE < 1 )) || echo "INFO: $PROGNAME: $*" >&2; }
+function debug() { (( VERBOSE < 2 )) || echo "DEBUG: $PROGNAME: $*" >&2; }
+
+if [[ -z $BASEURL ]]; then
+    fatal "No YaNA base URL, set YANA_BASEURL in env or give it through option -u, --url"
+fi
+
+if [[ -z $ENTITIES ]]; then
+    ENTITIES=($(_curl "$BASEURL/entities" |jq -r '.[]')) ||
+        fatal "Failed to get entities"
+fi
+
+for entity in "${ENTITIES[@]}"; do
+    verbose "Process entity $entity"
+    _curl "$BASEURL/entity/$entity/devices?short" |
+        jq -r --arg "sep" "$SEPARATOR" --arg "entity" "$entity" --arg "with_id" "$WITH_ID" '
+            map(
+                (if ($with_id == "1") then (.id + $sep) else ("") end) as $optid |
+                (.name|first//""|ascii_downcase|gsub("(^\\s+)|(\\s+$)";"")) as $name |
+                (.ip//[]|join(",")) as $ip |
+                (.mac|first//"") as $mac |
+                (.macVendor|first//"") as $macVendor |
+                (.type//[]|join(",")) as $type |
+                (.description|first//""|gsub("[\r\n].*";"")) as $description |
+                "\($optid)\($entity)\($sep)\($name)\($sep)\($ip)\($sep)\($mac)\($sep)\($macVendor)\($sep)\($type)\($sep)\($description)"
+            )[]
+        ' |
+        if [[ -n $FILTER ]]; then
+            grep -E -- "$FILTER"
+        else
+            cat
+        fi
+done

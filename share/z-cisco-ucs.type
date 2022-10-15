@@ -1,0 +1,13 @@
+# cisco ucs
+
+z-cisco-ucs;script;rancid -t z-cisco-ucs
+z-cisco-ucs;login;clogin
+z-cisco-ucs;module;nxos
+z-cisco-ucs;module;custom
+z-cisco-ucs;module;custom_cisco_ucs
+z-cisco-ucs;inloop;nxos::inloop
+z-cisco-ucs;command;custom::comment;show version brief
+z-cisco-ucs;command;rancid::RunCommand;connect nxos
+z-cisco-ucs;command;nxos::ShowVersion;show version
+z-cisco-ucs;command;rancid::RunCommand;    exit
+z-cisco-ucs;command;custom::config;show configuration all | no-more

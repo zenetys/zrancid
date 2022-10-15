@@ -1,0 +1,170 @@
+#!/bin/bash
+source "${0%/*}/../lib/zrancid.env" || exit 2
+
+PROGNAME=${0##*/}
+OIFS=$IFS
+set -o pipefail
+set -f
+export LC_ALL=C
+
+BASEDIR=${RANCID_BASEDIR:-$BASEDIR} # checked after fatal() is defined
+GROUP=default
+
+SEPARATOR=$'\t'
+NAME=
+JSON=
+CGI=$ZRANCID_CGI
+VERBOSE=0
+
+[[ $PROGNAME == *.cgi ]] && CGI=1
+
+function exit_usage() {
+    local status=${1:-0}
+    [[ $status != 0 ]] && exec >&2
+    echo "Usage: $PROGNAME -n NAME [OPTION]...
+Git log for a given RANCiD device
+
+Options:
+  -s, --separator   Output field separator, default tabulation
+  -n, --name        Device name
+  -j, --json        JSON output
+  -v, --verbose     Increase verbosity, may be repeated
+  -g, --cgi         CGI output, may be combined with JSON
+  -h, --help        Display this help
+"
+    exit "$status"
+}
+
+# Function from bdo cgi.lib
+function url_decode() {
+    url_decode=1 var_decode "$@"
+}
+
+# Function from bdo cgi.lib
+function var_decode() {
+    local prefix="$1" ; shift
+    local url_decode=${url_decode:-0}
+    local sub var val
+
+    for sub in $*; do
+        [[ $sub ]] || continue
+        var=${sub%%=*}             # get variable name
+        var=${var//[^[:alnum:]]/_} # replace non alnum by '_'
+        val=${sub#*=}              # get value
+        if (( url_decode == 1 )); then
+            val=${val//+/\\x20}        # replace '+' with <SP>
+            val=${val//%/\\x}          # replace '%' with \\x (%XX => \xXX)
+            val=${val//\\x\\x/%}       # replace \\x\\x (initial double '%') with '%'
+        fi  
+        eval "$prefix${var}=\$'${val}'"
+    done
+}
+
+shopt -s extglob
+while (( $# > 0 )); do
+    case "$1" in
+        -s|--separator) SEPARATOR=$2; shift ;;
+        -n|--name) NAME=$2; shift ;;
+        -j|--json) JSON=1 ;;
+        -g|--cgi) CGI=1 ;;
+        --verbose) (( VERBOSE++ )) ;;
+        --help) exit_usage 1 ;;
+        -+([jgvh]))
+            for (( i = 1; i < ${#1}; i++ )); do
+                case "${1:i:1}" in
+                    j) JSON=1 ;;
+                    g) CGI=1 ;;
+                    v) (( VERBOSE++ )) ;;
+                    h) exit_usage 0 ;;
+                esac
+            done
+            ;;
+    esac
+    shift
+done
+shopt -u extglob
+
+if [[ -n $QUERY_STRING ]]; then
+    IFS='&' url_decode QS_ "$QUERY_STRING"
+    [[ $QS_separator == 1 ]] && SEPARATOR=$QS_separator
+    [[ -n $QS_name ]] && NAME=$QS_name
+    [[ $QS_json == 1 ]] && JSON=1
+    [[ -n $QS_verbose ]] && (( VERBOSE += QS_verbose))
+fi
+
+function fatal() {
+    echo "FATAL: $PROGNAME: $*" >&2
+    exit 2
+}
+
+if [[ -n $CGI ]]; then
+    function fatal() {
+        echo 'Status: 500'
+        echo 'Content-type: text/plain'
+        echo
+        echo "$*"
+        exit 2
+    }
+fi
+
+[[ -z $NAME ]] && fatal "Device name required"
+
+[[ -z $BASEDIR ]] && fatal 'Bad env! rancid BASEDIR not set'
+
+cd "$BASEDIR/$GROUP" || fatal "Failed to cd into git root"
+
+# internal separator to avoid problems, eg: stat human mtime contains
+# spaces, rancid comments in router.db, etc.
+isep=$'\x17'
+
+case "$CGI,$JSON" in
+    1,1) printf 'Status: 200\nContent-type: application/json\n\n' ;;
+    1,) printf 'Status: 200\nContent-type: text/plain\n\n' ;;
+esac
+
+git --no-pager log --pretty="format:%H${isep}%ci${isep}%an${isep}%s" --shortstat -- "configs/$NAME" |
+    awk -v "OFS=$isep" -v "VERBOSE=$VERBOSE" '
+        state == 0 { data=$0; state = state+1; next; }
+        state == 1 {
+            del=0; add=0;
+            if (match($0, /, ([0-9]+) insertion/, cap)) { add = cap[1]; };
+            if (match($0, /, ([0-9]+) deletion/, cap)) { del = cap[1]; };
+            print data (VERBOSE > 0 ? OFS "-"del OFS "+"add : "");
+            state = state+1;
+            next;
+        }
+        state == 2 { state = 0; next; }
+    ' |
+    # json output
+    if [[ -n $JSON ]]; then
+        awk -F "$isep" '
+            function jencode(input, _output) {
+                # should be okay with ascii but probably not with accents
+                _output = gensub("\\\\", "\\\\\\\\", "g", input); # backslash
+                _output = gensub("\"", "\\\\\"", "g", _output); # double quote
+                _output = gensub("\t", "\\\\t", "g", _output); # tab
+                return _output;
+            }
+            BEGIN {
+                printf("[");
+                field2name[++max_field] = "id";
+                field2name[++max_field] = "date";
+                field2name[++max_field] = "author";
+                field2name[++max_field] = "subject";
+                field2name[++max_field] = "deletion";
+                field2name[++max_field] = "insertion";
+            }
+            {
+                printf("%s%s", (NR>1?",":""), "{");
+                for (i = 1; i <= NF && i <= max_field; i++) {
+                    printf("%s\"%s\":\"%s\"", (i>1?",":""), field2name[i], \
+                        jencode($(i)));
+                }
+                printf("}");
+            }
+            END { printf("]\n"); }'
+    else
+        # sed comand argument separator
+        sedsep=$'\x18'
+        sed -re "s${sedsep}${isep}${sedsep}${SEPARATOR}${sedsep}g"
+    fi

@@ -1,0 +1,6 @@
+#!/bin/bash
+export LC_ALL=C
+cd "$(git rev-parse --show-toplevel)"
+git ls-files |grep -vE '(^\.mtimes$)|((^|/)\.gitignore$)' |
+    xargs --no-run-if-empty stat -c $'%n\t%Y\t%y' > .mtimes
+git add .mtimes

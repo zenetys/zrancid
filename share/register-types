@@ -1,0 +1,16 @@
+#!/bin/bash
+PROGNAME=${0##*/}
+shopt -s nullglob
+function info() { echo "INFO: $PROGNAME: $*" >&2; }
+function warning() { echo "WARNING: $PROGNAME: $*" >&2; }
+conf=${1:-/etc/rancid/rancid.types.conf}
+types=( ${0%/*}/*.type )
+for i in "${types[@]}"; do
+    id=${i##*/}; id=${id%.type}
+    if [[ -s $conf ]] && grep -qE "^$id;" "$conf"; then
+        warning "Skip type $id, already in $conf"
+        continue
+    fi
+    info "Add type $id to $conf"
+    { echo; cat "$i"; } >> "$conf"
+done

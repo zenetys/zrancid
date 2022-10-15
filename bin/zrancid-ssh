@@ -1,0 +1,76 @@
+#!/bin/bash
+source "${0%/*}/../lib/zrancid.env" || exit 2
+
+PROGNAME=${0##*/}
+REALPROG=${PROGNAME#*-} # assume telnet|ssh
+
+function fatal() { echo "FATAL: $PROGNAME: $*" >&2; exit 2; }
+function info() { echo "INFO: $PROGNAME: $*" >&2; }
+
+[[ -z $ZRANCID_ETC_DIR ]] && fatal 'Bad env! ZRANCID_ETC_DIR not set'
+
+ETCHOSTS="$ZRANCID_ETC_DIR/hosts"
+
+function prun() {
+    local cmdstr
+    if (( BASH_VERSINFO[0] > 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] >= 4) )); then
+        cmdstr=${*@Q}
+    else
+        # fallback
+        cmdstr=$(q="'"; set -- "${@/#/$q}"; set -- "${@/%/$q}"; echo "$*")
+    fi
+    info "EXEC: $cmdstr"
+    ${DO_EXEC:+exec} "$@"
+}
+
+function pexec() { DO_EXEC=1 prun "$@"; }
+
+function parse-args__telnet() {
+    host=$1
+    port=$2
+}
+
+function parse-args__ssh() {
+    while (( $# > 0 )); do
+        case "$1" in
+            -p) args+=( -p "$2" ); port=$2; shift ;;
+            -l) args+=( -l "$2" ); user=$2; shift ;;
+            *) (( $# == 1 )) && host=$1 || args+=( "$1" ) ;;
+        esac
+        shift
+    done
+}
+
+args=(); user=; host=; port=
+declare -f -F "parse-args__$REALPROG" >/dev/null ||
+    fatal "Function not implemented: parse-args__$REALPROG"
+"parse-args__$REALPROG" "$@"
+[[ -z $host ]] && fatal "Failed to parse host, args = $*"
+[[ $host != ${host//\/} ]] && fatal "Bad character in host '$host'"
+
+function get-etc() {
+    REPLY=
+    [[ -r $ETCHOSTS/$host/$1 ]] || return 1
+    REPLY=$(< "$ETCHOSTS/$host/$1")
+}
+
+get-etc address || fatal "No IP for host '$host'"
+addr=$REPLY
+
+get-etc via
+via=$REPLY
+
+sshcmd=( ssh -o ConnectTimeout=10 )
+
+case "$REALPROG,$via" in
+    telnet,xe:*) cmd=( "${sshcmd[@]}" -t telnet@xe -- "${addr}${port:+:$port}%${via#xe:}" ) ;;
+    telnet,ssh:*) cmd=( "${sshcmd[@]}" "${via#ssh:}" -- telnet "${args[@]}" "$addr" ${port:+"$port"} ) ;;
+    telnet,*) cmd=( telnet "${args[@]}" "$addr" ${port:+"$port"} ) ;;
+    ssh,xe:*) cmd=( "${sshcmd[@]}" -t access@xe -- "${user:+$user@}${addr}${port:+:$port}%${via#xe:}" ) ;;
+    ssh,xe) cmd=( "${sshcmd[@]}" -t access@xe -- "${user:+$user@}${addr}${port:+:$port}" ) ;;
+    ssh,ssh:*) cmd=( "${sshcmd[@]}" -J "${via#ssh:}" "${args[@]}" "$addr" ) ;;
+    ssh,*) cmd=( "${sshcmd[@]}" "${args[@]}" "$addr" ) ;;
+    *) fatal "Unsupported program '$REALPROG'" ;;
+esac
+
+pexec "${cmd[@]}"

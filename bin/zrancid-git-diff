@@ -1,0 +1,124 @@
+#!/bin/bash
+source "${0%/*}/../lib/zrancid.env" || exit 2
+
+PROGNAME=${0##*/}
+OIFS=$IFS
+set -o pipefail
+set -f
+export LC_ALL=C
+
+BASEDIR=${RANCID_BASEDIR:-$BASEDIR} # checked after fatal() is defined
+GROUP=default
+
+NAME=
+CGI=$ZRANCID_CGI
+CONTEXT=
+
+[[ $PROGNAME == *.cgi ]] && CGI=1
+
+function exit_usage() {
+    local status=${1:-0}
+    [[ $status != 0 ]] && exec >&2
+    echo "Usage: $PROGNAME -n NAME -i COMMIT [OPTION]...
+Git diff for a given RANCiD device and commit ID
+
+Options:
+  -n, --name        Device name
+  -i, --commit      Commit hash
+  -U, --context     Diff context lines
+  -g, --cgi         CGI output, may be combined with JSON
+  -h, --help        Display this help
+"
+    exit "$status"
+}
+
+# Function from bdo cgi.lib
+function url_decode() {
+    url_decode=1 var_decode "$@"
+}
+
+# Function from bdo cgi.lib
+function var_decode() {
+    local prefix="$1" ; shift
+    local url_decode=${url_decode:-0}
+    local sub var val
+
+    for sub in $*; do
+        [[ $sub ]] || continue
+        var=${sub%%=*}             # get variable name
+        var=${var//[^[:alnum:]]/_} # replace non alnum by '_'
+        val=${sub#*=}              # get value
+        if (( url_decode == 1 )); then
+            val=${val//+/\\x20}        # replace '+' with <SP>
+            val=${val//%/\\x}          # replace '%' with \\x (%XX => \xXX)
+            val=${val//\\x\\x/%}       # replace \\x\\x (initial double '%') with '%'
+        fi  
+        eval "$prefix${var}=\$'${val}'"
+    done
+}
+
+shopt -s extglob
+while (( $# > 0 )); do
+    case "$1" in
+        -n|--name) NAME=$2; shift ;;
+        -i|--commit) COMMIT=$2; shift ;;
+        -U|--context) CONTEXT=$2; shift ;;
+        -g|--cgi) CGI=1 ;;
+        --help) exit_usage 1 ;;
+        -+([gh]))
+            for (( i = 1; i < ${#1}; i++ )); do
+                case "${1:i:1}" in
+                    g) CGI=1 ;;
+                    h) exit_usage 0 ;;
+                esac
+            done
+            ;;
+    esac
+    shift
+done
+shopt -u extglob
+
+if [[ -n $QUERY_STRING ]]; then
+    IFS='&' url_decode QS_ "$QUERY_STRING"
+    [[ -n $QS_name ]] && NAME=$QS_name
+    [[ -n $QS_commit ]] && COMMIT=$QS_commit
+    [[ -n $QS_context ]] && CONTEXT=$QS_context
+fi
+
+function fatal() {
+    echo "FATAL: $PROGNAME: $*" >&2
+    exit 2
+}
+
+if [[ -n $CGI ]]; then
+    function fatal() {
+        echo 'Status: 500'
+        echo 'Content-type: text/plain'
+        echo
+        echo "$*"
+        exit 2
+    }
+fi
+
+function do_diff() {
+    [[ -n $CGI ]] && printf 'Status: 200\nContent-type: text/plain\n\n'
+    git --no-pager diff ${CONTEXT:+"-U$CONTEXT"} "$COMMIT^" "$COMMIT" -- "configs/$NAME"
+}
+
+function do_show() {
+    [[ -n $CGI ]] && printf 'Status: 200\nContent-type: text/plain\n\n'
+    git --no-pager show "$COMMIT:configs/$NAME"
+}
+
+# XXX extract command from program name for consistency with the other tools
+ACTION=${PROGNAME##*-}
+declare -f -F "do_$ACTION" >/dev/null || fatal 'Invalid command, check usage'
+
+[[ -z $NAME ]] && fatal 'Device name required'
+[[ -z $COMMIT ]] && fatal 'Git commit hash required'
+
+[[ -z $BASEDIR ]] && fatal 'Bad env! rancid BASEDIR not set'
+
+cd "$BASEDIR/$GROUP" || fatal 'Failed to cd into git root'
+
+"do_$ACTION"

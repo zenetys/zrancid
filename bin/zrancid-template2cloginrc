@@ -1,0 +1,71 @@
+#!/bin/bash
+
+PROGNAME=${0##*/}
+
+function exit_usage() {
+    local status=${1:-0}
+    [[ $status != 0 ]] && exec >&2
+    echo "Usage: $PROGNAME DEVICE TEMPLATE...
+Convert cloginrc template format to cloginrc formmat
+
+Options:
+  -h, --help        Display this usage help
+"
+    exit "$status"
+}
+
+ARGS=()
+while (( $# > 0 )); do
+    case "$1" in
+        -h|--help) exit_usage 0 ;;
+       --) shift; ARGS+=( "$@" ); break ;;
+       -*) exit_usage 1 ;;
+        *) ARGS+=( "$1" ) ;;
+    esac
+    shift
+done
+
+[[ -z ${ARGS[0]} ]] && exit_usage 1
+[[ -z ${ARGS[1]} ]] && exit_usage 1
+
+exec gawk -v "PROGNAME=$PROGNAME" \
+          -v "NAME=${ARGS[0]}" \
+'
+    { $0 = gensub(/^[ \t]*|[ \t]*$/, "", "g", $0); } # trim
+    $0 == "" || /^#/ { next; }
+
+    {
+        if ($0 == "reset")
+            delete data;
+        else if (match($0, /^reset[ \t]+([^ \t]+)/, cap)) {
+            delete data[cap[1]];
+        }
+        else if (match($0, /^add[ \t]+([^ \t]+)[ \t]+(.+)/, cap)) {
+            data[cap[1]] = cap[2];
+            # useless but output is nicer with a coherent order
+            if (!(cap[1] in seen_order)) {
+                order[iorder++] = cap[1];
+                seen_order[cap[1]] = 1;
+            }
+        }
+        else {
+            printf("ERROR: %s: %s: Invalid data in %s at line %s\n", \
+                PROGNAME, NAME, FILENAME, FNR) > "/dev/stderr";
+            has_error = 1;
+            exit;
+        }
+    }
+
+    END {
+        if (has_error)
+            exit 2
+        if (!("method" in data) || data["method"] == "") {
+            printf("ERROR: %s: %s: Missing directive: method\n", PROGNAME, NAME) > "/dev/stderr";
+            exit 2
+        }
+        for (i = 0; i < iorder; i++) {
+            if ((order[i] in data))
+                printf("add %s %s %s\n", order[i], NAME, data[order[i]]);
+        }
+    }
+' "${ARGS[@]:1}"

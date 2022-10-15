@@ -1,0 +1,8 @@
+#!/bin/bash
+source "${0%/*}/../lib/zrancid.env" || exit 2
+exec perl -e '
+use rancid;
+rancid::loadtype($ARGV[0]);
+exit(1) if !defined($script) or !length($script);
+print "$script\n";
+' -- "$@"

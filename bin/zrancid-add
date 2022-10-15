@@ -1,0 +1,172 @@
+#!/bin/bash
+source "${0%/*}/../lib/zrancid.env" || exit 2
+
+PROGNAME=${0##*/}
+OIFS=$IFS
+shopt -s nullglob
+
+function fatal() { echo "FATAL: $PROGNAME: $*" >&2; exit 2; }
+function info() { echo "INFO: $PROGNAME: $*" >&2; }
+
+[[ -z $ZRANCID_ETC_DIR ]] && fatal 'Bad env! ZRANCID_ETC_DIR not set'
+[[ -z $BASEDIR ]] && fatal 'Bad env! rancid BASEDIR not set'
+
+GROUP=default
+
+function exit_usage() {
+    local status=${1:-0}
+    [[ $status != 0 ]] && exec >&2
+    echo "\
+Usage: ${PROGNAME%-*}-add|edit [-r[r]] name type [template [address [var=val...]]]
+   or: ${PROGNAME%-*}-add|edit [-r[r]] name var=[val]...
+   or: ${PROGNAME%-*}-rm name
+Add, edit or delete a (z)RAANCiD device configuration
+
+Options:
+  -r, --reset           Delete existing configuration first
+                        Repeat (ie: -rr) to delete custom cloginrc.*
+  -h, --help            Display this usage help
+
+RANCiD types:"
+    awk -F ';' '$0 !~ /^[ \t]*#/ && $1 && $2 == "login" {print $1}' \
+        /etc/rancid/rancid.types.base \
+        /etc/rancid/rancid.types.conf |
+            sort -u |xargs |fold -s -w 70 |sed -e 's,^,  ,'
+    echo "
+Templates:"
+    find "$ZRANCID_ETC_DIR/cloginrc/" -mindepth 1 -maxdepth 1 -printf '%P\n' |
+        sort -u |sed -e 's,^,  ,'
+    echo "
+Variables:
+  type=<value>          RANCiD type (see list above)
+  cloginrc=<template>   cloginrc template file, will create a symlink
+  address=<value>       IP address or hostname of the device
+  via=xe:<xe-spec>      Set via XE like ...%<dst>
+  via=ssh:<ssh-spec>    Set via SSH jump: ssh -J <dst> ...
+"
+    exit "$status"
+}
+
+RESET=0
+declare -A KV=()
+narg=0
+
+shopt -s extglob
+while (( $# > 0 )); do
+    case "$1" in
+        -r|--reset) (( RESET++ )) ;;
+        -h|--help) exit_usage 0 ;;
+        -+([rh]))
+            for (( i = 1; i < ${#1}; i++ )); do
+                case "${1:i:1}" in
+                    r) (( RESET++ )) ;;
+                    h) exit_usage 0 ;;
+                esac
+            done
+            ;;
+        !(=)?*=*)
+            KV["${1%%=*}"]=${1#*=}
+            ;;
+        !(=)?*)
+            case $(( narg++ )) in
+                0) DEVICE=${1,,} ;;
+                1) KV[type]=$1 ;;
+                2) KV[cloginrc]=$1 ;;
+                3) KV[address]=$1 ;;
+                *) exit_usage 1 ;;
+            esac
+            ;;
+        *) exit_usage 1
+    esac
+    shift
+done
+shopt -u extglob
+
+[[ -z "$DEVICE" ]] && exit_usage 1
+ACTION=${PROGNAME##*-}
+
+# used to shorten feedback messages in most cases
+_etc_dir=${ZRANCID_ETC_DIR/$HOME/\~}
+_base_dir=${BASEDIR/$HOME/\~}
+
+if [[ $ACTION == rm || $RESET -ge 1 ]]; then
+    if [[ -d $ZRANCID_ETC_DIR/hosts/$DEVICE ]]; then
+        findopts=( -mindepth 1 -maxdepth 1 -not -type d )
+        reset_msg=
+        if [[ $ACTION != rm && $RESET -lt 2 ]]; then
+            findopts+=( -not -name 'cloginrc.*' )
+            reset_msg='(preserving extra cloginrc.*)'
+        fi
+        info "RM: $_etc_dir/hosts/$DEVICE/* $reset_msg"
+        find "$ZRANCID_ETC_DIR/hosts/$DEVICE/" "${findopts[@]}" -delete
+
+        if [[ $ACTION == rm ]]; then
+            info "RM: $_etc_dir/hosts/$DEVICE"
+            rmdir "$ZRANCID_ETC_DIR/hosts/$DEVICE" ||
+                fatal "Failed to remove device directory"
+        fi
+    fi
+    info "RM: $_base_dir/$GROUP/router.db == $DEVICE"
+    sed -i -e "/^${DEVICE//./\\.};/d" "$BASEDIR/$GROUP/router.db" ||
+        fatal "Failed to update router.db"
+fi
+
+# done with rm
+[[ $ACTION == rm ]] && exit 0
+
+if [[ ! -d "$ZRANCID_ETC_DIR/hosts/$DEVICE" ]]; then
+    info "MKDIR: $_etc_dir/hosts/$DEVICE"
+    mkdir -p "$ZRANCID_ETC_DIR/hosts/$DEVICE" ||
+        fatal "Failed to create device directory"
+fi
+
+function kv_setter() {
+    info "SET: $_etc_dir/hosts/$DEVICE/$1 = $2"
+    echo "$2" > "$ZRANCID_ETC_DIR/hosts/$DEVICE/$1" ||
+        fatal "Failed to set $key"
+}
+
+function kv_setter_cloginrc() {
+    local template=$2
+
+    if [[ $template != "${template//[\/]}" ]]; then
+        template=$(realpath --relative-to "$ZRANCID_ETC_DIR/hosts/$DEVICE" "$template")
+        [[ $template == ../../../* ]] && template=$(readlink -f "$template")
+    else
+        template="../../cloginrc/$template"
+    fi
+
+    (cd "$ZRANCID_ETC_DIR/hosts/$DEVICE" && [[ -f $template ]]) ||
+        fatal "cloginrc template not found"
+
+    info "LN: $_etc_dir/hosts/$DEVICE/cloginrc -> $template"
+    ln -snf "$template" "$ZRANCID_ETC_DIR/hosts/$DEVICE/cloginrc" ||
+        fatal "Failed to create cloginrc template symlink"
+}
+
+function kv_setter_type() {
+    info "SET: $_base_dir/$GROUP/router.db = $DEVICE;$2;up"
+    if [[ -s "$BASEDIR/$GROUP/router.db" ]]; then
+        sed -i -n -e "/^${DEVICE//./\\.};/!p" -e "\$a $DEVICE;$2;up" \
+            "$BASEDIR/$GROUP/router.db" && sort -u -o "$BASEDIR/$GROUP/router.db"{,}
+    else
+        echo "$DEVICE;$2;up" > "$BASEDIR/$GROUP/router.db"
+    fi
+    (( $? == 0 )) || fatal "Failed to update router.db"
+}
+
+for key in "${!KV[@]}"; do
+    if [[ -z ${KV[$key]} ]]; then
+        if [[ -e $ZRANCID_ETC_DIR/hosts/$DEVICE/$key ]]; then
+            info "RM: $_etc_dir/hosts/$DEVICE/$key"
+            rm "$ZRANCID_ETC_DIR/hosts/$DEVICE/$key" || fatal "Failed to remove $key"
+        fi
+        continue
+    fi
+
+    if declare -F -f "kv_setter_$key" > /dev/null; then
+        "kv_setter_$key" "$key" "${KV[$key]}"
+    else
+        "kv_setter" "$key" "${KV[$key]}"
+    fi
+done

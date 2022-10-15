@@ -1,0 +1,237 @@
+#!/bin/bash
+source "${0%/*}/../lib/zrancid.env" || exit 2
+
+PROGNAME=${0##*/}
+OIFS=$IFS
+shopt -s nullglob
+set -o pipefail
+
+function fatal() { echo "FATAL: $PROGNAME: $*" >&2; exit 2; }
+function error() { echo "ERROR: $PROGNAME: $*" >&2; }
+function info() { echo "INFO: $PROGNAME: $*" >&2; }
+function warning() { echo "WARNING: $PROGNAME: $*" >&2; }
+
+[[ -z $ZRANCID_ETC_DIR ]] && fatal 'Bad env! ZRANCID_ETC_DIR not set'
+[[ -z $TMPDIR ]] && fatal 'Bad env! rancid TMPDIR not set'
+
+# instance specific
+OUR_TMP_DIR="$TMPDIR/$PROGNAME.$RANDOM.$RANDOM"
+trap '[[ -d $OUR_TMP_DIR && -z $KEEP_OUR_TMP_DIR ]] && {
+            rm -f "$OUR_TMP_DIR"/*
+            rmdir "$OUR_TMP_DIR"
+}' EXIT
+
+function exit_usage() {
+    local status=${1:-0}
+    [[ $status != 0 ]] && exec >&2
+    echo "Usage: ${PROGNAME%-*}-<COMMAND> [OPTION...] ARG...
+RANCiD helper program
+
+Commands:
+  run device-regex-pattern
+        Call rancid-run for the matching devices. This is the classic
+        execution of RANCiD, with lock, config save, git update, etc.
+        Special pattern @all is an alias to select all devices, use it
+        to mimic the rancid-run command without -r argument otherwise
+        you will get a commit per changed device.
+
+  debug device-regex-pattern
+        Call rancid script for the matching devices. It produces
+        <device>.raw and <device>.new files in the current directory.
+        The .new file corresponds to the final config, produced by
+        rancid parsers from the .raw file.
+
+  test device-regex-pattern
+        Same as debug but dump the .new file on stdout. Both .new and
+        .raw files get cleaned-up on exit, unless -K, --keep is set.
+
+  replay device raw-file
+        Call rancid script with a .raw file in order to regenerate the
+        .new file. The device will not be contacted. This is useful to
+        debug when writing RANCiD parsers, ie: the process that creates
+        a final config (the .new file) from a .raw file.
+
+  login device
+        Call plogin. It opens a shell to the device. If a pattern is
+        given for the device argument, the first matching device is
+        used as target.
+
+  exec device-regex-pattern commands
+        Call plogin to connect to the matching devices and executes the
+        given commands. Multiple matching devices are processed in
+        sequence. Note: commands must be given as a single argument and
+        multiple commands must be separated by semi-colon \";\".
+
+  cloginrc device-regex-pattern
+        Dump generated cloginrc file for the matching devices. Use
+        option -P, --passwords to display password, otherwise they get
+        replaced by string <rest-of-line-removed>
+
+Options:
+  -P, --passwords   Do not hide password in cloginrc file
+  -K, --keep        Keep tmpdir on exit
+  -h, --help        Display this usage help
+"
+    exit "$status"
+}
+
+function prun() {
+    local cmdstr
+    if (( BASH_VERSINFO[0] > 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] >= 4) )); then
+        cmdstr=${*@Q}
+    else
+        # fallback
+        cmdstr=$(q="'"; set -- "${@/#/$q}"; set -- "${@/%/$q}"; echo "$*")
+    fi
+    info "EXEC: $cmdstr"
+    ${DO_EXEC:+exec} "$@"
+}
+
+function generate_cloginrc() {
+    local i
+    {   for i in "$@"; do
+            if [[ ! -f $ZRANCID_ETC_DIR/hosts/$i/cloginrc ]]; then
+                warning "No cloginrc template for device $i"
+                continue
+            fi
+            zrancid-template2cloginrc "$i" "$ZRANCID_ETC_DIR/hosts/$i"/cloginrc{,.*}
+        done
+        echo 'add timeout * 10'
+        echo 'add sshcmd * zrancid-ssh'
+        echo 'add telnetcmd * zrancid-telnet'
+    } >> "$CLOGINRC"
+}
+
+function zrancid-run() {
+    local cmd=(
+        rancid-run
+        -f "$ZRANCID_ETC_DIR/rancid.conf"
+        -c "Updates from RANCiD run on $(date +%Y-%m-%dT%H:%M:%S%:z)"
+    )
+    if [[ ${ARGS[1]} == '@all' ]]; then
+        prun "${cmd[@]}"
+    else
+        for (( i = 0; i < ${#DEVICES[@]}; i++ )); do
+            info "DEVICE: ${DEVICES[i]}"
+            prun "${cmd[@]}" -r "${DEVICES[i]}"
+        done
+    fi
+}
+
+function _zrancid_debug_device() {
+    local device=$1 type=$2
+    local script
+    info "DEVICE: $device"
+    script=$(prun zrancid-type2script "$type")
+    if [[ $? != 0 || -z $script ]]; then
+        error "Failed to get rancid script command for device $device"
+        return 1
+    fi
+    (   set -f
+        set -- $script # yup...
+        prun "$@" -d "$device" )
+}
+
+function zrancid-debug() {
+    local i
+    for (( i = 0; i < ${#DEVICES[@]}; i++ )); do
+        _zrancid_debug_device "${DEVICES[i]}" "${TYPES[i]}"
+    done
+}
+
+function zrancid-test() {( # in subshell
+    cd "$OUR_TMP_DIR" || fatal "Something is wrong with our tmpdir"
+    for (( i = 0; i < ${#DEVICES[@]}; i++ )); do
+        _zrancid_debug_device "${DEVICES[i]}" "${TYPES[i]}" || continue
+        if [[ -f "${DEVICES[i]}.new" ]]; then
+            cat "${DEVICES[i]}.new"
+        else
+            error "${DEVICES[i]}.new NOT FOUND!"
+        fi
+    done
+)}
+
+function zrancid-replay() {
+    [[ -n ${ARGS[2]} ]] || exit_usage 1
+    local script=$(prun zrancid-type2script "${TYPES[0]}")
+    if [[ $? != 0 || -z $script ]]; then
+        fatal "Failed to get rancid script command for device ${DEVICE[0]}"
+    fi
+    (   set -f
+        set -- $script # yup...
+        prun "$@" -d -f "${ARGS[2]}" "${DEVICES[i]}" )
+}
+
+function zrancid-login() {
+    prun plogin -z "${TYPES[0]}" "${DEVICES[0]}"
+}
+
+function zrancid-exec() {
+    [[ -n ${ARGS[2]} ]] || exit_usage 1
+    for (( i = 0; i < ${#DEVICES[@]}; i++ )); do
+        info "DEVICE: ${DEVICES[i]}"
+        prun plogin -z "${TYPES[i]}" "${DEVICES[i]}" ${ARGS[2]:+-c "${ARGS[2]}"}
+    done
+}
+
+function zrancid-cloginrc() {
+    while read -r; do
+        re='^(add[[:space:]]+password[[:space:]]+[^[:space:]]+[[:space:]]+)'
+        if [[ -n $HIDE_PASSWORDS && $REPLY =~ $re ]]; then
+            REPLY="${BASH_REMATCH[1]}<rest-of-line-removed>"
+        fi
+        echo "$REPLY"
+    done < "$CLOGINRC"
+}
+
+HIDE_PASSWORDS=1
+KEEP_OUR_TMP_DIR=
+ARGS=()
+
+shopt -s extglob
+while (( $# > 0 )); do
+    case "$1" in
+        -P|--passwords) HIDE_PASSWORDS= ;;
+        -K|--keep) KEEP_OUR_TMP_DIR=1 ;;
+        -h|--help) exit_usage 0 ;;
+        -+([PKh]))
+            for (( i = 1; i < ${#1}; i++ )); do
+                case "${1:i:1}" in
+                    P) HIDE_PASSWORDS= ;;
+                    K) KEEP_OUR_TMP_DIR=1 ;;
+                    h) exit_usage 0 ;;
+                esac
+            done
+            ;;
+       --) shift; ARGS+=( "$@" ); break ;;
+       -*) exit_usage 1 ;;
+        *) ARGS+=( "$1" ) ;;
+    esac
+    shift
+done
+shopt -u extglob
+
+# XXX extract command from program name for consistency with the other tools
+ARGS=( "${PROGNAME##*-}" "${ARGS[@]}" )
+
+declare -F -f "zrancid-${ARGS[0]}" > /dev/null || exit_usage 1
+[[ -n ${ARGS[1]} ]] || exit_usage 1
+
+DEVICES=()
+TYPES=()
+while IFS=$'\x16' read -r device x y type; do
+    DEVICES+=( "$device" )
+    TYPES+=( "$type" )
+done < <(zrancid-ls -s $'\x16' -v -- "${ARGS[1]}")
+(( ${#DEVICES[@]} > 0 )) || fatal 'Device(s) not found!'
+
+# make sure we have a tmpdir
+mkdir -p "$OUR_TMP_DIR" || fatal 'Failed to create tmpdir'
+
+# build cloginrc
+export CLOGINRC="$OUR_TMP_DIR/cloginrc"
+info "ENV: $(declare -p CLOGINRC)"
+generate_cloginrc "${DEVICES[@]}"
+
+# run command
+"zrancid-${ARGS[0]}"

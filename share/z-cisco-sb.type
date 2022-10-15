@@ -1,0 +1,12 @@
+# cisco sb
+
+z-cisco-sb;script;rancid -t z-cisco-sb
+z-cisco-sb;login;csblogin
+z-cisco-sb;module;iossb
+z-cisco-sb;module;custom
+z-cisco-sb;module;custom_cisco_sb
+#z-cisco-sb;inloop;iossb::inloop
+z-cisco-sb;inloop;custom::inloop
+z-cisco-sb;command;iossb::ShowVersion;show version
+z-cisco-sb;command;iossb::ShowSystem;show system
+z-cisco-sb;command;iossb::WriteTerm;show running-config

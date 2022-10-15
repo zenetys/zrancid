@@ -1,0 +1,9 @@
+#!/bin/bash
+PROGNAME=${0##*/}
+function speak() { echo "$HOSTNAME> $PROGNAME: $*"; }
+function die() { speak "$*"; exit 2; }
+speak 'Hello!'
+speak "SSH_ORIGINAL_COMMAND = $SSH_ORIGINAL_COMMAND"
+[[ -z $SSH_ORIGINAL_COMMAND ]] && die 'Bad env! Bye.'
+[[ -n "${SSH_ORIGINAL_COMMAND//[[:alnum:]._-]}" ]] && die 'Invalid value!'
+exec zrancid-login "$SSH_ORIGINAL_COMMAND"

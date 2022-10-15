@@ -1,0 +1,23 @@
+#/bin/bash
+
+PROGNAME=${0##*/}
+fatal() { echo "FATAL: $PROGNAME: $*" >&2; exit 2; }
+
+RANCID_CONFIG=${RANCID_CONFIG:-/etc/rancid/rancid.conf}
+source "$RANCID_CONFIG" || fatal "Failed to soure $RANCID_CONFIG"
+
+echo '# $ZRANCID_ETC_DIR/rancid.conf'
+echo
+
+echo "umask $(umask)"
+
+echo "declare -x PATH=$PATH:\$HOME/bin:/opt/zrancid/bin"
+echo "declare -x PERL5LIB=$PERL5LIB:\$HOME/lib/perl:/opt/zrancid/lib/perl"
+
+echo "declare -x TMPDIR=\$HOME/tmp"
+echo "declare -x BASEDIR=\$HOME/data"
+echo "declare -x CVSROOT=\$BASEDIR/.bare"
+echo "declare -x LOGDIR=\$BASEDIR/logs"
+echo "declare -x RCSSYS=git"
+echo "declare -x MAX_ROUNDS=0 "
+echo "declare -x LIST_OF_GROUPS=default"

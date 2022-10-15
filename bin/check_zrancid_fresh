@@ -1,0 +1,101 @@
+#!/bin/bash
+
+PROGNAME=${0##*/}
+
+function nagios_exit_usage() {
+    echo "\
+Usage: $PROGNAME [OPTION...] -e entity
+Nagios plugin to check for (z)RANCiD backup freshness
+
+Options:
+  -e, --entity NAME         Entity name
+  -w, --WARNING SECONDS     Warning threshold in seconds
+  -c, --CRITICAL SECONDS    Critical threshold in seconds
+  -s, --min-size BYTES      File size in bytes
+  -h, --help                Display this help
+"
+    exit 3
+}
+
+STATUS_PRIO=( 0 1 3 2 )
+STATUS_TEXT=( OK WARNING CRITICAL UNKNOWN )
+
+# $1: current status
+# $2: other_status
+# $REPLY: new value for current status
+function worsen_status() {
+    local current=$1; shift
+    local other=$1; shift
+    if (( STATUS_PRIO[other] > STATUS_PRIO[current] )); then
+        REPLY=$other
+    else
+        REPLY=$current
+    fi
+}
+
+entity=
+declare -A perf=(
+    [fresh]=0
+    [too_old]=0
+    [too_small]=0
+)
+declare -A warn=()
+declare -A crit=()
+
+while (( $# > 0 )); do
+    case "$1" in
+        -e|--entity) entity=$2; shift ;;
+        -w|--warning) warn[too_old]=$2; shift ;;
+        -c|--critical) crit[too_old]=$2; shift ;;
+        -s|--min-size) crit[too_small]=$2; shift ;;
+        *) nagios_exit_usage ;;
+    esac
+    shift
+done
+
+[[ -z $entity ]] && nagios_exit_usage
+
+now=$(date +%s)
+state=0
+long_output=()
+
+data=$(zrancid-ls -e "$entity")
+ret=$?
+if (( ret != 0 )); then
+    echo "UNKNOWN: Command zrancid-ls failed status $ret"
+    exit 3
+fi
+
+
+while read -r device last size; do
+    fresh=1
+    if [[ -n ${crit[too_old]} ]]; then
+        if (( now - last > crit[too_old] )); then
+            worsen_status "$state" "2"; state=$REPLY
+            (( perf[too_old]++, fresh=0 ))
+            long_output+=( "$device: too old (crit)" )
+        elif (( now - last > warn[too_old] )); then
+            worsen_status "$state" "1"; state=$REPLY
+            (( perf[too_old]++, fresh=0 ))
+            long_output+=( "$device: too old (warn)" )
+        fi
+    fi
+    if [[ -n ${crit[too_small]} ]] && (( size < crit[too_small] )); then
+        worsen_status "$state" "2"; state=$REPLY
+        (( perf[too_small]++, fresh=0 ))
+        long_output+=( "$device: too small (crit)" )
+    fi
+    (( perf[fresh]+=fresh ))
+done < <(zrancid-ls -e "$entity")
+
+output=
+perfdata=
+for k in "${!perf[@]}"; do
+    [[ (-n ${warn[$k]} || -n ${crit[$k]}) && ${perf[$k]} != 0 ]] && e='**' || e=
+    output+="${output:+, }${e}${k}=${perf[$k]}${e}"
+    perfdata+="${perfdata:+ }'$k'=${perf[$k]};${warn[$k]};${crit[$k]}"
+done
+
+echo "${STATUS_TEXT[$state]}: $output|$perfdata"
+(IFS=$'\n'; [[ -n $long_output ]] && echo "${long_output[*]}")
+exit "$state"

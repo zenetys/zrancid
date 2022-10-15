@@ -1,0 +1,260 @@
+#!/bin/bash
+source "${0%/*}/../lib/zrancid.env" || exit 2
+
+PROGNAME=${0##*/}
+OIFS=$IFS
+set -o pipefail
+set -f
+export LC_ALL=C
+
+BASEDIR=${RANCID_BASEDIR:-$BASEDIR} # checked after fatal() is defined
+GROUP=default
+
+SEPARATOR=$'\t'
+FILTER=() # or'ed patterns
+DOMAIN=
+HUMAN=
+JSON=
+CGI=$ZRANCID_CGI
+VERBOSE=0
+
+[[ $PROGNAME == *.cgi ]] && CGI=1
+
+function exit_usage() {
+    local status=${1:-0}
+    [[ $status != 0 ]] && exec >&2
+    echo "Usage: $PROGNAME [OPTION]... [REGEX-FILTER]...
+List rancid devices registered in router.db
+
+Options:
+  -s, --separator   Output field separator, default tabulation
+  -d, --domain      Shortcut to filter on the domain part
+  -e, --entity      Alias of -d, --domain
+  -H, --human       Human readable stat() output
+  -j, --json        JSON output
+  -v, --verbose     Increase verbosity, may be repeated
+  -g, --cgi         CGI output, may be combined with JSON
+  -h, --help        Display this help
+
+REGEX-FILTER applies on devices names.
+Special filter @all is an alias to filter all devices.
+"
+    exit "$status"
+}
+
+# Function from bdo cgi.lib
+function url_decode() {
+    url_decode=1 var_decode "$@"
+}
+
+# Function from bdo cgi.lib
+function var_decode() {
+    local prefix="$1" ; shift
+    local url_decode=${url_decode:-0}
+    local sub var val
+
+    for sub in $*; do
+        [[ $sub ]] || continue
+        var=${sub%%=*}             # get variable name
+        var=${var//[^[:alnum:]]/_} # replace non alnum by '_'
+        val=${sub#*=}              # get value
+        if (( url_decode == 1 )); then
+            val=${val//+/\\x20}        # replace '+' with <SP>
+            val=${val//%/\\x}          # replace '%' with \\x (%XX => \xXX)
+            val=${val//\\x\\x/%}       # replace \\x\\x (initial double '%') with '%'
+        fi  
+        eval "$prefix${var}=\$'${val}'"
+    done
+}
+
+SAVEARGS=( "$@" )
+shopt -s extglob
+while (( $# > 0 )); do
+    case "$1" in
+        -s|--separator) SEPARATOR=$2; shift ;;
+        -d|-e|--domain|--entity) DOMAIN="$2"; shift ;;
+        -H|--human) HUMAN=1 ;;
+        -j|--json) JSON=1 ;;
+        -g|--cgi) CGI=1 ;;
+        --verbose) (( VERBOSE++ )) ;;
+        --help) exit_usage 0 ;;
+        -+([EHjgvh]))
+            for (( i = 1; i < ${#1}; i++ )); do
+                case "${1:i:1}" in
+                    H) HUMAN=1 ;;
+                    j) JSON=1 ;;
+                    g) CGI=1 ;;
+                    v) (( VERBOSE++ )); LS_ARGS+=( -v ) ;;
+                    h) exit_usage 0 ;;
+                esac
+            done
+            ;;
+        --) shift; break ;;
+        -*) exit_usage 1 ;;
+        *) break ;;
+    esac
+    shift
+done
+shopt -u extglob
+
+FILTER+=( "$@" )
+(( ${#FILTER[@]} == 0 )) && FILTER='.*'
+[[ ${FILTER[*]} == @all ]] && FILTER='.*'
+
+if [[ -n $QUERY_STRING ]]; then
+    IFS='&' url_decode QS_ "$QUERY_STRING"
+    [[ $QS_separator == 1 ]] && SEPARATOR=$QS_separator
+    [[ -n $QS_filter ]] && FILTER=$QS_filter
+    [[ -n $QS_domain ]] && DOMAIN=$QS_domain
+    [[ -n $QS_entity ]] && DOMAIN=$QS_entity
+    [[ $QS_json == 1 ]] && JSON=1
+    [[ $QS_human == 1 ]] && HUMAN=1
+    [[ -n $QS_verbose ]] && (( VERBOSE += QS_verbose))
+fi
+
+function fatal() {
+    echo "FATAL: $PROGNAME: $*" >&2
+    exit 2
+}
+
+if [[ -n $CGI ]]; then
+    function fatal() {
+        echo 'Status: 500'
+        echo 'Content-type: text/plain'
+        echo
+        echo "$*"
+        exit 2
+    }
+fi
+
+[[ -z $BASEDIR ]] && fatal 'Bad env! rancid BASEDIR not set'
+
+# internal separator to avoid problems, eg: stat human mtime contains
+# spaces, rancid comments in router.db, etc.
+isep=$'\x17'
+
+routerdb_data=$(
+    awk -F ';' \
+        -v "OFS=$isep" \
+        -v "VERBOSE=$VERBOSE" \
+    '
+    /^[ \t]*#/ { next; }
+    /^[ \t]*$/ { next; }
+    {
+        # rebuild the line with custom OFS separator
+        $1 = $1;
+    
+        NF = VERBOSE+1
+        print;
+    }
+    ' "$BASEDIR/$GROUP/router.db" |
+        while IFS=$isep read -r device rest; do
+            if [[ -n $DOMAIN && $device != *.$DOMAIN ]]; then
+                continue
+            fi
+            for i in "${FILTER[@]}"; do
+                if [[ $device =~ $i ]]; then
+                    echo "${device}${rest:+${isep}${rest}}"
+                fi
+            done
+        done |
+        sort -t "$isep" -k 1b,1
+)
+
+if (( $? != 0 )); then
+    fatal 'Failed to get data from router.db'
+fi
+
+case "$CGI,$JSON" in
+    1,1) printf 'Status: 200\nContent-type: application/json\n\n' ;;
+    1,) printf 'Status: 200\nContent-type: text/plain\n\n' ;;
+esac
+
+mtimes_field=2
+[[ -n $HUMAN ]] && mtimes_field=3
+
+join -j 1 -t "$isep" -a 1 -o 1.1,2.2 \
+    <([[ -n $routerdb_data ]] && { echo "$routerdb_data" |awk -F "$isep" '{print $1}'; }) \
+    <([[ -f "$BASEDIR/$GROUP/.mtimes" ]] && sed -nre 's,^configs/(.+),\1,p' "$BASEDIR/$GROUP/.mtimes" |
+            sort -t $'\t' -k 1b,1 |
+            awk -F $'\t' -v "OFS=$isep" -v "HUMAN=$HUMAN" '
+                {   if (HUMAN) {
+                        sub(/ /, "T", $3);
+                        sub(/ /, "", $3);
+                        sub(/..$/, ":&", $3);
+                        print $1, $3;
+                    }
+                    else
+                        print $1, $2;
+                }') |
+    join -j 1 -t "$isep" -a 1 -o 1.1,1.2,2.2 \
+        - \
+        <(echo "$routerdb_data" |
+            while IFS=$isep read -r file rest; do
+                file="$BASEDIR/$GROUP/configs/$file"
+                [[ -e $file ]] || continue
+                echo "$file"
+            done |
+            xargs --no-run-if-empty stat -c "%n${isep}%s" |
+            awk -F "$isep" -v "OFS=$isep" -v "HUMAN=$HUMAN" '
+                function human(input, mult, sep, _sym) {
+                    _sym = 1;
+                    while (input >= mult && _sym < HSYM_LEN) {
+                        _sym++;
+                        input = input / mult;
+                    }
+                    return sprintf("%.2lf%s%s", input, sep, HSYM[_sym]);
+                }
+                BEGIN { HSYM_LEN = split(" ,K,M,G,T", HSYM, ","); }
+                {   gsub(/^.*\//, "", $1);
+                    if (HUMAN)
+                        $2 = human($2, 1024, "") "iB";
+                    print;
+                }') |
+    join -j 1 -t "$isep" \
+        - \
+        <(echo "$routerdb_data") |
+    # json output
+    if [[ -n $JSON ]]; then
+        awk -F "$isep" -v "HUMAN=$HUMAN" '
+            function jencode(input, type, _output) {
+                if (type == "number") {
+                    _output = (input ~ /^[0-9.]+$/) ? input : "null";
+                }
+                else {
+                    # should be okay with ascii but probably not with accents
+                    _output = gensub("\\\\", "\\\\", "g", input); # backslash
+                    _output = gensub("\"", "\\\"", "g", _output); # double quote
+                    _output = gensub("\t", "\\t", "g", _output); # tab
+                    _output = "\"" _output "\""
+                }
+                return _output;
+            }
+            BEGIN {
+                printf("[");
+                field2name[1] = "device";
+                field2name[2] = "mtime";
+                field2name[3] = "size";
+                field2name[4] = "type";
+                field2name[5] = "state";
+                field2name[6] = "comment";
+                max_field = 6;
+                field2type[1] = "string";
+                field2type[2] = HUMAN ? "string" : "number";
+                field2type[3] = HUMAN ? "string" : "number";
+                field2type[4] = "type";
+                field2type[5] = "state";
+                field2type[6] = "comment";
+            }
+            {
+                printf("%s%s", (NR>1?",":""), "{");
+                for (i = 1; i <= NF && i <= max_field; i++) {
+                    printf("%s\"%s\":%s", (i>1?",":""), field2name[i], \
+                        jencode($(i), field2type[i]));
+                }
+                printf("}");
+            }
+            END { printf("]\n"); }'
+    else
+        sed -re "s,$isep,$SEPARATOR,g"
+    fi

@@ -1,0 +1,344 @@
+#!/bin/bash
+source "${0%/*}/../lib/zrancid.env" || exit 2
+
+PROGNAME=${0##*/}
+OIFS=$IFS
+shopt -s nullglob
+set -o pipefail
+# set -f is set after loading modules
+
+function fatal() { echo "FATAL: $PROGNAME: $*" >&2; exit 2; }
+function error() { echo "ERROR: $PROGNAME: $*" >&2; }
+function warning() { echo "WARNING: $PROGNAME: $*" >&2; }
+function info() { echo "INFO: $PROGNAME: $*" >&2; }
+function verbose() { (( VERBOSE < 1 )) || echo "INFO: $PROGNAME: $*" >&2; }
+function verbose2() { (( VERBOSE < 2 )) || echo "INFO: $PROGNAME: $*" >&2; }
+function verbose3() { (( VERBOSE < 3 )) || echo "INFO: $PROGNAME: $*" >&2; }
+
+[[ -z $ZRANCID_ETC_DIR ]] && fatal 'Bad env! ZRANCID_ETC_DIR not set'
+
+DRY_RUN=1
+VERBOSE=0
+
+function exit_usage() {
+    local status=${1:-0}
+    [[ $status != 0 ]] && exec >&2
+    echo "Usage: $PROGNAME [OPTION]...
+Look for YANA devices missing from (z)RANCiD and add them
+
+Options:
+  -e, --entity      Focus yana-ls on a specific entity, may be repeated
+  -F, --filter      Filter yana-ls output with grep -E
+  -v, --verbose     Increase verbosity, may be repeated
+  -y, --yes         Disable dry-run and proceed with zrancid-add
+  -h, --help        Display this help
+"
+    exit "$status"
+}
+
+function prun() {
+    local cmdstr
+    if (( BASH_VERSINFO[0] > 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] >= 4) )); then
+        cmdstr=${*@Q}
+    else
+        # fallback
+        cmdstr=$(q="'"; set -- "${@/#/$q}"; set -- "${@/%/$q}"; echo "$*")
+    fi
+    info "EXEC${DRY_RUN:+ (dry-run)}: $cmdstr"
+    [[ -n $DRY_RUN ]] && return 0
+    ${DO_EXEC:+exec} "$@"
+}
+
+# Index a string: lowercase with non-alnum characters
+# replaced by an underscore
+# $1: Input string
+# result: $REPLY
+function index() {
+    REPLY=${1,,}
+    REPLY=${REPLY//[^[:alnum:]_]/_}
+}
+
+# Test if a function is defined
+# $1: function name to test, value gets index'ed
+function fexists() {
+    index "$1"
+    declare -f -F "$REPLY" >/dev/null
+}
+
+# Find the most precise function named <base>[_<suffix>] by reducing
+# the <suffix> part from right to left. The first function found gets
+# executed.
+#
+# $1: Function base name
+# $@: Optional suffixes appended to the base name to build
+#   a function name
+# return: The selected function return value, or 99 if no
+#   function was found
+#
+# Notes:
+# - Suffixes are split on [^[:alnum:]] characters.
+# - Candidate function names get index'ed.
+# - $REPLY gets reset to an empty value before calling the selected
+#   function. When returning 99, indicating that no function to run
+#   could be selected, $REPLY is also reset to an empty value.
+#
+# Ex: ffirst base some-thing toTry
+# Will try the following functions names in sequence and use the
+# first exissting name:
+# - base_some_thing_totry
+# - base_some_thing
+# - base_some
+# - base
+#
+function ffirst() {
+    local fn_base=$1; shift
+    local fn_suffix=( ${@//[^[:alnum:]]/$IFS} )
+    local i f
+    for (( i = ${#fn_suffix[@]}; i >= 0; i-- )); do
+        f=$fn_base
+        [[ -n ${fn_suffix[*]:0:$i} ]] && f+="_${fn_suffix[*]:0:$i}"
+        fexists "$f" || continue
+        f=$REPLY; REPLY=
+        "$f"; return $?
+    done
+    REPLY=
+    return 99
+}
+
+# $@: IP shell pattern
+# return: On successful match, 0 is returned and the corresponding IP
+#   is set in $REPLY. If there is no match, 1 is returned and $REPLY
+#   is set to an empty string.
+function get_first_matching_ip() {
+    local IFS=,;
+    local ips=( $ips )
+    local i
+    for ip in "${ips[@]}"; do
+        for pattern in "$@"; do
+            if [[ $ip == $pattern ]]; then
+                REPLY=$ip
+                return 0
+            fi
+        done
+    done
+    REPLY=
+    return 1
+}
+
+function filter_rancid_device() {
+    # need a name
+    [[ -z $name ]] && return 1
+    # keep network devices
+    [[ ${types,,} == *switch* ]] && return 0
+    [[ ${types,,} == *wlan* ]] && return 0
+    [[ ${types,,} == *router* ]] && return 0
+    # exclude by default
+    return 1
+}
+
+
+function get_rancid_ip() {
+    # use the first IP by default
+    REPLY=${ips%%,*}
+}
+
+function get_rancid_name() {
+    REPLY=${name%%.*}
+    [[ -z $REPLY ]] && return 1
+    REPLY+=".$entity"
+    REPLY=${REPLY,,}
+}
+
+function get_rancid_type() {
+    case "${descr,,}/${types,,}" in
+        *aruba*/*wlan*) REPLY=z-aruba-ap; return 0 ;;
+    esac
+    case "${vendor,,}" in
+        routerboard.com) REPLY=routeros; return 0 ;;
+    esac
+    case "${types,,}" in
+        *ciscosb*) REPLY=z-cisco-sb; return 0 ;;
+        *cisco\ sg*) REPLY=z-cisco-sb; return 0 ;;
+        *cisco\ sf*) REPLY=z-cisco-sb; return 0 ;;
+        *cisco*) REPLY=cisco; return 0 ;;
+        *hpetherswitch*) REPLY=hp; return 0 ;;
+        *hpnetworking*) REPLY=hp; return 0 ;;
+        *hpswitch*) REPLY=hp; return 0 ;;
+    esac
+    case "${descr,,}" in
+        *aruba*) REPLY=hp; return 0 ;;
+        *cisco\ sg*) REPLY=z-cisco-sb; return 0 ;;
+        *cisco\ nx-os*\ ucs,*) REPLY=z-cisco-ucs; return 0 ;;
+        *cisco\ nx-os*) REPLY=cisco-nx; return 0 ;;
+        hp\ j*) REPLY=hp; return 0 ;;
+        huawei\ switch*) REPLY=z-huawei; return 0 ;;
+        huawei\ versatile\ routing\ platform*) REPLY=z-huawei; return 0 ;;
+        *planet\ *switch) REPLY=z-cisco-sb; return 0 ;;
+        *procurve*) REPLY=hp; return 0 ;;
+    esac
+    return 1
+}
+
+function auto_yana() {
+    # input
+    local seq=$1; shift
+    local id=$1; shift
+    local entity=$1; shift
+    local name=$1; shift
+    local ips=$1; shift
+    local mac=$1; shift
+    local vendor=$1; shift
+    local types=$1; shift
+    local descr=$1; shift
+    verbose3_diag_input_reply_logstr; local logstr=$REPLY
+
+    # output
+    r_name=         # rancid name
+    r_type=         # rancid type
+    r_cloginrc=     # rancid cloginrc template
+    r_address=      # rancid contact address
+    r_via=          # rancid contact via
+
+    # rancid contact address
+    ffirst get_rancid_ip "$entity"
+    if [[ $? != 0 || -z $REPLY ]]; then
+        verbose2 "$logstr => SKIP, no ip"
+        return 1
+    fi
+    ip=$REPLY # available through $ip for convenience
+    r_address=$REPLY
+
+    # filter
+    if ! ffirst filter_rancid_device "$entity"; then
+        verbose2 "$logstr => SKIP, filter"
+        return 1
+    fi
+
+    # rancid name
+    ffirst get_rancid_name "$entity"
+    if [[ $? != 0 || -z $REPLY ]]; then
+        verbose2 "$logstr => SKIP, no rancid name"
+        return 1
+    fi
+    r_name=$REPLY
+
+    # skip if already provisioned in zrancid
+    if [[ -d $ZRANCID_ETC_DIR/hosts/$r_name ]]; then
+        verbose2 "$logstr => SKIP, already setup as $r_name"
+        return 1
+    fi
+
+    # rancid type
+    ffirst get_rancid_type "$entity"
+    if [[ $? != 0 || -z $REPLY ]]; then
+        verbose_diag_input
+        verbose_diag_output
+        warning "$logstr => SKIP, no rancid type"
+        return 1
+    fi
+    r_type=$REPLY
+
+    # rancid cloginrc template
+    ffirst get_rancid_cloginrc "$entity"
+    if [[ $? != 0 || -z $REPLY ]]; then
+        verbose_diag_input
+        verbose_diag_output
+        warning "$logstr => SKIP, no rancid cloginrc"
+        return 1
+    fi
+    r_cloginrc=$REPLY
+
+    # rancid context via
+    ffirst get_rancid_via "$entity"
+    r_via=$REPLY
+
+    # register
+    verbose_diag_input
+    verbose_diag_output
+    add_task zrancid-add "$r_name" "type=$r_type" \
+        "cloginrc=$r_cloginrc" "address=$r_address" \
+        "via=$r_via"
+}
+
+function verbose3_diag_input_reply_logstr() {
+    verbose3 "INPUT: -- seq=$seq"
+    local logstr1="$entity/${id:0:6}..${id: -6}"
+    local logstr2=
+    local i
+    for i in name ips mac vendor types descr; do
+        verbose3 "$logstr1: INPUT: $i=${!i}"
+        if [[ -z $logstr2 && -n ${!i} ]]; then
+            local len=${!i}; len=${#len}
+            logstr2="$i=${!i:0:25}"
+            (( len > 25 )) && logstr2+=...
+        fi
+    done
+    REPLY="${logstr1}${logstr2:+, $logstr2}"
+}
+
+function verbose_diag_input() {
+    local i
+    for i in name ips mac vendor types descr; do
+        verbose "$logstr: DIAG (input): $i = ${!i}"
+    done
+}
+
+function verbose_diag_output() {
+    local i
+    for i in r_address r_name r_type r_cloginrc r_via; do
+        verbose "$logstr: DIAG (rancid): $i = ${!i}"
+    done
+}
+
+yanalsopts=()
+shopt -s extglob
+while (( $# > 0 )); do
+    case "$1" in
+        -e|--entity) yanalsopts+=( "$1" "$2" ); shift ;;
+        -F|--filter) yanalsopts+=( "$1" "$2" ); shift ;;
+        -y|--yes) DRY_RUN= ;;
+        --verbose) (( VERBOSE++ )); yanalsopts+=( "$1" ) ;;
+        --help) exit_usage 0 ;;
+        -+([yvh]))
+            for (( i = 1; i < ${#1}; i++ )); do
+                case "${1:i:1}" in
+                    y) DRY_RUN= ;;
+                    v) (( VERBOSE++ )); yanalsopts+=( -v ) ;;
+                    h) exit_usage 0 ;;
+                esac
+            done
+            ;;
+        *) exit_usage 1 ;;
+    esac
+    shift
+done
+shopt -u extglob
+
+for inc in "$ZRANCID_ETC_DIR"/auto/*.yana.inc; do
+    source "$inc" || fatal "Failed to source: $inc"
+done
+
+set -f
+
+result_tasks=()
+function add_task() {
+    local IFS=$'\x16'
+    result_tasks+=( "$*" )
+}
+function call_task() {
+    local task="${result_tasks[$1]}"
+    local IFS=$'\x16'; set -- $task; unset IFS
+    prun "$@"
+}
+
+yana-ls --with-id "${yanalsopts[@]}" -s $'\x16' |
+{
+    input_lineno=0
+    while IFS=$'\x16' read -ra input; do
+        auto_yana $(( ++input_lineno )) "${input[@]}"
+    done
+
+    for (( i = 0; i < ${#result_tasks[@]}; i++ )); do
+        call_task "$i"
+    done
+}

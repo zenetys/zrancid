@@ -1,0 +1,20 @@
+# huawei / vrp
+
+# same as vrp but without dir flash info because it is changing
+# too frequently
+
+z-huawei;script;rancid -t z-huawei
+z-huawei;login;xilogin
+z-huawei;module;vrp
+z-huawei;module;custom
+z-huawei;module;custom_huawei
+z-huawei;inloop;custom::inloop
+#z-huawei;inloop;vrp::inloop
+z-huawei;command;vrp::DispVersion;display version
+z-huawei;command;vrp::DispStartup;display startup
+z-huawei;command;vrp::DispDevice;display device
+z-huawei;command;vrp::DispDeviceMfg;display device manufacture-info
+z-huawei;command;vrp::DispTransciever;display transceiver verbose
+z-huawei;command;vrp::DispDebug;display debugging
+#z-huawei;command;vrp::DirSlotN;dir /all /all-filesystems
+z-huawei;command;vrp::WriteTerm;display current-configuration
