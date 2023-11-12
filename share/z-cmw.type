@@ -1,0 +1,58 @@
+# z-cmw
+#
+# Some HPE, 3 Com, H3C (Comware)
+# Author: Jethro R Binks (jrbinks)
+# https://sites.google.com/site/jrbinks/code/rancid/cmwrancid
+# Modified by ZENETYS / Zlab Team to suit our needs
+
+z-cmw;script;rancid -t z-cmw
+z-cmw;login;cmwlogin
+z-cmw;module;cmw
+z-cmw;inloop;cmw::inloop
+z-cmw;command;cmw::CommentOutput;display version
+#z-cmw;command;cmw::CommentOutput;display boot-loader
+#z-cmw;command;cmw::CommentOutput;display startup
+#z-cmw;command;cmw::CommentOutput;dir /all
+#z-cmw;command;cmw::CommentOutput;dir /all unit2>flash:/
+#z-cmw;command;cmw::CommentOutput;dir /all slot2#flash:/
+#z-cmw;command;cmw::CommentOutput;dir /all unit3>flash:/
+#z-cmw;command;cmw::CommentOutput;dir /all slot3#flash:/
+#z-cmw;command;cmw::CommentOutput;dir /all unit4>flash:/
+#z-cmw;command;cmw::CommentOutput;dir /all slot4#flash:/
+#z-cmw;command;cmw::CommentOutput;dir /all unit5>flash:/
+#z-cmw;command;cmw::CommentOutput;dir /all slot5#flash:/
+#z-cmw;command;cmw::CommentOutput;dir /all unit6>flash:/
+#z-cmw;command;cmw::CommentOutput;dir /all slot6#flash:/
+#z-cmw;command;cmw::CommentOutput;dir /all unit7>flash:/
+#z-cmw;command;cmw::CommentOutput;dir /all slot7#flash:/
+#z-cmw;command;cmw::CommentOutput;dir /all unit8>flash:/
+#z-cmw;command;cmw::CommentOutput;dir /all slot8#flash:/
+z-cmw;command;cmw::CommentOutput;display device
+#z-cmw;command;cmw::CommentOutput;display device manuinfo
+#z-cmw;command;cmw::CommentOutput;display fan
+#z-cmw;command;cmw::CommentOutput;display power
+#z-cmw;command;cmw::CommentOutput;display poe powersupply
+#z-cmw;command;cmw::CommentOutput;display poe temperature-protection
+#z-cmw;command;cmw::CommentOutput;display transceiver interface
+#z-cmw;command;cmw::CommentOutput;display cluster
+#z-cmw;command;cmw::CommentOutput;display domain
+#z-cmw;command;cmw::CommentOutput;display local-user
+#z-cmw;command;cmw::CommentOutput;display password-control
+#z-cmw;command;cmw::CommentOutput;display password-control super
+#z-cmw;command;cmw::CommentOutput;display ssh server status
+#z-cmw;command;cmw::CommentOutput;display irf
+#z-cmw;command;cmw::CommentOutput;display xrn-fabric
+#z-cmw;command;cmw::CommentOutput;display ftm topology-database
+#z-cmw;command;cmw::DisplayFib;display fib
+#z-cmw;command;cmw::DisplayIPRoutes;display ip routing-table
+#z-cmw;command;cmw::CommentOutput;display ospf
+#z-cmw;command;cmw::CommentOutput;display ospf brief
+#z-cmw;command;cmw::CommentOutput;display vlan all
+#z-cmw;command;cmw::CommentOutput;display lacp sys
+#z-cmw;command;cmw::CommentOutput;display link-aggregation summary
+#z-cmw;command;cmw::CommentOutput;display link-aggregation verbose
+#z-cmw;command;cmw::CommentOutput;display loopback-detection
+#z-cmw;command;cmw::CommentOutput;display mirror all
+#z-cmw;command;cmw::CommentOutput;display ntp-service status
+#z-cmw;command;cmw::CommentOutput;display stp root
+z-cmw;command;cmw::DisplayCurrent;display current-configuration
