@@ -6,9 +6,9 @@
 z-huawei;script;rancid -t z-huawei
 z-huawei;login;xilogin
 z-huawei;module;vrp
-z-huawei;module;custom
-z-huawei;module;custom_huawei
-z-huawei;inloop;custom::inloop
+z-huawei;module;zrancid
+z-huawei;module;zrancid_huawei
+z-huawei;inloop;zrancid::inloop
 #z-huawei;inloop;vrp::inloop
 z-huawei;command;vrp::DispVersion;display version
 z-huawei;command;vrp::DispStartup;display startup
