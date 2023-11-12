@@ -1,4 +1,6 @@
-# aruba wifi access points
+# z-aruba-ap
+#
+# Aruba wifi access points
 
 z-aruba-ap;script;rancid -t z-aruba-ap
 z-aruba-ap;login;hlogin

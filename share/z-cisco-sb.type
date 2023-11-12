@@ -1,4 +1,6 @@
-# cisco sb
+# z-cisco-sb
+#
+# Cisco Small Business / Cisco SMB / Cisco SB
 
 z-cisco-sb;script;rancid -t z-cisco-sb
 z-cisco-sb;login;csblogin

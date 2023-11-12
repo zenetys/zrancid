@@ -1,4 +1,6 @@
-# cisco ucs
+# z-cisco-ucs
+#
+# Cisco Unified Computing System / Cisco UCS
 
 z-cisco-ucs;script;rancid -t z-cisco-ucs
 z-cisco-ucs;login;clogin

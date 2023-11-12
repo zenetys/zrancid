@@ -1,7 +1,7 @@
-# huawei / vrp
-
-# same as vrp but without dir flash info because it is changing
-# too frequently
+# z-huawei
+#
+# Huawei / VRP
+# Same as vrp but without dir flash info because it is changing too frequently.
 
 z-huawei;script;rancid -t z-huawei
 z-huawei;login;xilogin
