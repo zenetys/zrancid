@@ -169,7 +169,7 @@ function get_rancid_type() {
         *aruba*) REPLY=hp; return 0 ;;
         *cisco\ sg*) REPLY=z-cisco-sb; return 0 ;;
         *cisco\ nx-os*\ ucs,*) REPLY=z-cisco-ucs; return 0 ;;
-        *cisco\ nx-os*) REPLY=cisco-nx; return 0 ;;
+        *cisco\ nx-os*) REPLY=z-cisco-nx; return 0 ;;
         hp\ j*) REPLY=hp; return 0 ;;
         huawei\ switch*) REPLY=z-huawei; return 0 ;;
         huawei\ versatile\ routing\ platform*) REPLY=z-huawei; return 0 ;;
