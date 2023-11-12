@@ -102,7 +102,7 @@ sub _generic {
 
         if (!defined($indent)) {
             $indent = ($_ =~ /^(\s*)/)[0];
-            print STDERR "    In zrancid::config: Initial indent = <$indent>\n";
+            print STDERR "    In zrancid::_generic: Initial indent = <$indent>\n";
         }
 
         next if _dels($_, $_options{dels});
