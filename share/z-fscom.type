@@ -1,0 +1,13 @@
+# z-fscom
+#
+# Devices from FS.COM
+# Eg: S3900-48T6S-R, N8560-48BC
+
+z-fscom;script;rancid -t z-fscom
+z-fscom;login;clogin
+z-fscom;module;ios
+z-fscom;module;zrancid
+z-fscom;module;zrancid_fscom
+z-fscom;inloop;ios::inloop
+z-fscom;command;zrancid::comment;show version
+z-fscom;command;zrancid::config;show running-config
