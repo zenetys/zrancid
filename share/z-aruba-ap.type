@@ -4,8 +4,8 @@
 
 z-aruba-ap;script;rancid -t z-aruba-ap
 z-aruba-ap;login;hlogin
-z-aruba-ap;module;custom
-z-aruba-ap;module;custom_aruba_ap
-z-aruba-ap;inloop;custom::inloop
-z-aruba-ap;command;custom::comment;show version
-z-aruba-ap;command;custom::config;show running-config
+z-aruba-ap;module;zrancid
+z-aruba-ap;module;zrancid_aruba_ap
+z-aruba-ap;inloop;zrancid::inloop
+z-aruba-ap;command;zrancid::comment;show version
+z-aruba-ap;command;zrancid::config;show running-config
