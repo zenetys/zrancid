@@ -158,7 +158,15 @@ TOP:
                 $prompt =~ s/([][}{)(+\\])/\\$1/g;
                 print STDERR ("PROMPT MATCH: $prompt\n") if ($debug);
             }
+
             print STDERR ("HIT COMMAND: $_") if ($debug);
+
+            # ignore empty prompt lines with no command
+            if ($cmd =~ /^$options{comment} ignore me.*/) {
+                print STDERR ("SKIP IGNORE COMMAND\n") if ($debug);
+                next TOP;
+            }
+
             if (!defined($commands{$cmd})) {
                 print STDERR "$host: found unexpected command - \"$cmd\"\n";
                 $clean_run = 0;
@@ -175,6 +183,13 @@ TOP:
                 $clean_run = 0;
                 last TOP;
             }
+        }
+    }
+
+    # cleanup ignored commands, if any left, those are not required
+    foreach $cmd (keys %commands) {
+        if ($cmd =~ /^$options{comment} ignore me.*/) {
+            delete($commands{$cmd});
         }
     }
 }
