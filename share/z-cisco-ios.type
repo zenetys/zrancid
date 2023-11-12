@@ -1,0 +1,86 @@
+# z-cisco-ios
+#
+# Cisco IOS
+
+z-cisco-ios;script;rancid -t z-cisco-ios
+z-cisco-ios;login;clogin
+z-cisco-ios;module;ios
+z-cisco-ios;module;zrancid
+z-cisco-ios;module;zrancid_cisco_ios
+#z-cisco-ios;inloop;ios::inloop
+z-cisco-ios;inloop;zrancid::inloop
+z-cisco-ios;command;ios::ShowVersion;show version
+z-cisco-ios;command;ios::ShowRedundancy;show redundancy secondary
+z-cisco-ios;command;ios::ShowIDprom;show idprom backplane
+z-cisco-ios;command;ios::ShowInstallActive;show install active
+z-cisco-ios;command;ios::ShowEnv;show env all
+z-cisco-ios;command;ios::ShowRSP;show rsp chassis-info
+z-cisco-ios;command;ios::ShowGSR;show gsr chassis
+z-cisco-ios;command;ios::ShowGSR;show diag chassis-info
+z-cisco-ios;command;ios::ShowBoot;show boot
+z-cisco-ios;command;ios::ShowBoot;show bootvar
+z-cisco-ios;command;ios::ShowBoot;show variables boot
+z-cisco-ios;command;ios::ShowLicense;show license udi
+z-cisco-ios;command;ios::ShowLicense;show license feature
+z-cisco-ios;command;ios::ShowLicense;show license
+z-cisco-ios;command;ios::ShowLicense;show license summary
+z-cisco-ios;command;ios::ShowActivationKey;show activation-key;ASA/PIX
+#z-cisco-ios;command;ios::ShowFlash;show flash:
+#z-cisco-ios;command;ios::DirSlotN;dir /all nvram:
+#z-cisco-ios;command;ios::DirSlotN;dir /all bootflash:
+#z-cisco-ios;command;ios::DirSlotN;dir /all slot0:
+#z-cisco-ios;command;ios::DirSlotN;dir /all disk0:
+#z-cisco-ios;command;ios::DirSlotN;dir /all slot1:
+#z-cisco-ios;command;ios::DirSlotN;dir /all disk1:
+#z-cisco-ios;command;ios::DirSlotN;dir /all slot2:
+#z-cisco-ios;command;ios::DirSlotN;dir /all disk2:
+#z-cisco-ios;command;ios::DirSlotN;dir /all harddisk:
+#z-cisco-ios;command;ios::DirSlotN;dir /all harddiska:
+#z-cisco-ios;command;ios::DirSlotN;dir /all harddiskb:
+#z-cisco-ios;command;ios::DirSlotN;dir /all sup-bootdisk:;c6500 sup32
+#z-cisco-ios;command;ios::DirSlotN;dir /all sup-bootflash:;c6500 ios
+#z-cisco-ios;command;ios::DirSlotN;dir /all sup-microcode:;c6500 ios
+#z-cisco-ios;command;ios::DirSlotN;dir /all slavenvram:
+#z-cisco-ios;command;ios::DirSlotN;dir /all slavebootflash:
+#z-cisco-ios;command;ios::DirSlotN;dir /all slaveslot0:
+#z-cisco-ios;command;ios::DirSlotN;dir /all slavedisk0:
+#z-cisco-ios;command;ios::DirSlotN;dir /all slaveslot1:
+#z-cisco-ios;command;ios::DirSlotN;dir /all slavedisk1:
+#z-cisco-ios;command;ios::DirSlotN;dir /all slaveslot2:
+#z-cisco-ios;command;ios::DirSlotN;dir /all slavedisk2:
+#z-cisco-ios;command;ios::DirSlotN;dir /all slavesup-bootflash:;c7600
+#z-cisco-ios;command;ios::DirSlotN;dir /all sec-nvram:
+#z-cisco-ios;command;ios::DirSlotN;dir /all sec-bootflash:
+#z-cisco-ios;command;ios::DirSlotN;dir /all sec-slot0:
+#z-cisco-ios;command;ios::DirSlotN;dir /all sec-disk0:
+#z-cisco-ios;command;ios::DirSlotN;dir /all sec-slot1:
+#z-cisco-ios;command;ios::DirSlotN;dir /all sec-disk1:
+#z-cisco-ios;command;ios::DirSlotN;dir /all sec-slot2:
+#z-cisco-ios;command;ios::DirSlotN;dir /all sec-disk2:
+z-cisco-ios;command;ios::ShowContAll;show controllers
+z-cisco-ios;command;ios::ShowContCbus;show controllers cbus
+z-cisco-ios;command;ios::ShowDiagbus;show diagbus
+z-cisco-ios;command;ios::ShowDiag;show diag
+z-cisco-ios;command;ios::ShowCapture;show capture;ASA/PIX
+z-cisco-ios;command;ios::ShowModule;show module switch;c6500 ios vss
+z-cisco-ios;command;ios::ShowModule;show module;c6500 ios
+z-cisco-ios;command;ios::ShowSpeVersion;show spe version
+z-cisco-ios;command;ios::ShowC7200;show c7200
+z-cisco-ios;command;ios::ShowCellular;show cellular 0 profile;Cellular modem
+z-cisco-ios;command;ios::ShowHWProgrammable;show hw-programmable all
+z-cisco-ios;command;ios::ShowInventory;show inventory raw
+z-cisco-ios;command;ios::ShowInventory;show inventory;ASA/PIX
+z-cisco-ios;command;ios::ShowVTP;show vtp status
+z-cisco-ios;command;ios::ShowDot1x;show dot1x
+z-cisco-ios;command;ios::ShowVLAN;show vlan
+z-cisco-ios;command;ios::ShowVLAN;show vlan-switch
+#z-cisco-ios;command;zrancid::comment;show spanning-tree
+z-cisco-ios;command;ios::ShowDetail;show switch detail
+z-cisco-ios;command;ios::ShowSDM;show sdm prefer
+z-cisco-ios;command;ios::ShowMTU;show system mtu
+z-cisco-ios;command;ios::ShowDebug;show debug
+z-cisco-ios;command;ios::ShowShun;show shun;ASA/PIX
+z-cisco-ios;command;ios::WriteTerm;more system:running-config;ASA/PIX
+z-cisco-ios;command;ios::WriteTerm;show running-config view full;workaround for role-based CLI
+z-cisco-ios;command;ios::WriteTerm;show running-config
+z-cisco-ios;command;ios::WriteTerm;write term
