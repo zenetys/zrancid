@@ -1,0 +1,11 @@
+# z-hpe
+#
+# Some HP switches look like Huawei.
+# Eg: HPE 5130 48G PoE+ 4SFP+
+
+z-hpe;script;rancid -t z-hpe
+z-hpe;login;hlogin
+z-hpe;module;vrp
+z-hpe;inloop;vrp::inloop
+z-hpe;command;vrp::DispVersion;display version
+z-hpe;command;vrp::WriteTerm;display current-configuration
