@@ -2,15 +2,29 @@
 PROGNAME=${0##*/}
 shopt -s nullglob
 function info() { echo "INFO: $PROGNAME: $*" >&2; }
-function warning() { echo "WARNING: $PROGNAME: $*" >&2; }
+function fatal() { echo "FATAL: $PROGNAME: $*" >&2; exit 2; }
 conf=${1:-/etc/rancid/rancid.types.conf}
 types=( ${0%/*}/*.type )
-for i in "${types[@]}"; do
-    id=${i##*/}; id=${id%.type}
-    if [[ -s $conf ]] && grep -qE "^$id;" "$conf"; then
-        warning "Skip type $id, already in $conf"
-        continue
-    fi
-    info "Add type $id to $conf"
-    { echo; cat "$i"; } >> "$conf"
-done
+info "Update zrancid types in $conf"
+# Remove text between "# BEGIN/END zrancid" marks, including marks,
+# cleanup consecutive blank lines, then append our types definitions.
+cp -a "$conf"{,.old} || fatal "Failed to backup $conf"
+{
+    [[ -f $conf ]] && awk -v "PROGNAME=$PROGNAME" '
+/^#### BEGIN zrancid/ { inside = 1; }
+!inside && !($0 == "" && previous == "") { previous = $0; printed++; print; }
+/^#### END zrancid/ { inside = 0; }
+!inside && match($0, /^(z-[^;]+);/, cap) && !warned[cap[1]] {
+    warned[cap[1]] = 1;
+    print "WARNING: " PROGNAME ": Found type " cap[1] " using zrancid z- " \
+        "prefix outside our managed block, please rename it" > "/dev/stderr";
+}
+END { if (printed > 0 && previous != "") print ""; }
+    ' "$conf.old"
+    printf '#### BEGIN zrancid - DO NOT REMOVE THIS MARK\n'
+    for i in "${types[@]}"; do
+        printf '\n'
+        cat "$i"
+    done
+    printf '\n#### END zrancid - DO NOT REMOVE THIS MARK\n'
+} > "$conf"
