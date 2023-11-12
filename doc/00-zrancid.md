@@ -1,5 +1,7 @@
 ### Install (z)RANCiD:
 
+**Note:** On Debian family distros, make sure `/bin/sh` points to bash instead of dash. Before going any further, run `dpkg-reconfigure dash` and choose to **not use dash**.
+
 Described here for el8 (rocky):
 
 ```
