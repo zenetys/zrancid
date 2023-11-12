@@ -1,0 +1,12 @@
+# z-arubaos-cx
+#
+# ArubaOS-CX / AOS-CX
+# Firmware may not support write term, use show running-config instead.
+
+z-arubaos-cx;script;rancid -t z-arubaos-cx
+z-arubaos-cx;login;hlogin
+z-arubaos-cx;module;zrancid
+z-arubaos-cx;module;zrancid_aruba_ap
+z-arubaos-cx;inloop;zrancid::inloop
+z-arubaos-cx;command;zrancid::comment;show version
+z-arubaos-cx;command;zrancid::config;show running-config
