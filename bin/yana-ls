@@ -50,7 +50,9 @@ done
 shopt -u extglob
 
 function _curl() {
-    curl -m "$TIMEOUT" -f -sS "$@"
+    # YANA_CURL_OPTIONS is not an array as it may come from the environment;
+    # assume set -f was set to prevent pathname expansion.
+    curl -m "$TIMEOUT" -f -sS $YANA_CURL_OPTIONS "$@"
 }
 
 function fatal() { echo "FATAL: $PROGNAME: $*" >&2; exit 2; }
