@@ -31,7 +31,7 @@ Make the script work as a CGI script. Arguments get read from the $QUERY_STRING 
 
 In this example apache runs on the same host as the (z)RANCiD environment. We just call the scripts with ZRANCID_RUNAS=rancid and ZRANCID_CGI=1.
 
-Apache configuration:
+Apache configuration; you need to grant access for testing:
 
 ```
 root>  cat > /etc/httpd/conf.d/zrancid.conf <<'EOF'
@@ -41,8 +41,9 @@ ScriptAlias /zrancid/ls /opt/zrancid/bin/zrancid-ls
 <LocationMatch "^/zrancid/(diff|log|ls|show)$">
     SetEnv ZRANCID_RUNAS rancid
     SetEnv ZRANCID_CGI 1
-    # do better auth and access control
-    Require all granted
+    # do proper auth and access control or grant for testing
+    #Require all granted
+    Require all denied
 </LocationMatch>
 EOF
 
