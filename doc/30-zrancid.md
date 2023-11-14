@@ -54,6 +54,8 @@ Register custom types available in (z)RANCiD share directory:
 rancid>  /opt/zrancid/share/register-types /etc/rancid/rancid.types.conf
 ```
 
+### Add cloginrc templates:
+
 Add your cloginrc templates. Here we copy samples from (z)RANCiD share directory. The format is the same as cloginrc(5) but without the device name field.
 
 ```
