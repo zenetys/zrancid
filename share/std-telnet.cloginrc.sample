@@ -1,3 +1,4 @@
 add user admin
-add password password password
+add password userpassword enablepassword
 add method telnet
+add telnetcmd zrancid-telnet

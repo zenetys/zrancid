@@ -1,3 +1,4 @@
 add user admin
 add password none-use-ssh-pubkey
 add method ssh
+add sshcmd zrancid-ssh
