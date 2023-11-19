@@ -64,7 +64,7 @@ sshcmd=( ssh -o ConnectTimeout=10 )
 
 case "$REALPROG,$via" in
     telnet,xe:*) cmd=( "${sshcmd[@]}" -t telnet@xe -- "${addr}${port:+:$port}%${via#xe:}" ) ;;
-    telnet,ssh:*) cmd=( "${sshcmd[@]}" "${via#ssh:}" -- telnet "${args[@]}" "$addr" ${port:+"$port"} ) ;;
+    telnet,ssh:*) cmd=( "${sshcmd[@]}" -t "${via#ssh:}" -- telnet "${args[@]}" "$addr" ${port:+"$port"} ) ;;
     telnet,*) cmd=( telnet "${args[@]}" "$addr" ${port:+"$port"} ) ;;
     ssh,xe:*) cmd=( "${sshcmd[@]}" -t access@xe -- "${user:+$user@}${addr}${port:+:$port}%${via#xe:}" ) ;;
     ssh,xe) cmd=( "${sshcmd[@]}" -t access@xe -- "${user:+$user@}${addr}${port:+:$port}" ) ;;
