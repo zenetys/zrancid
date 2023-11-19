@@ -69,6 +69,7 @@ case "$REALPROG,$via" in
     ssh,xe:*) cmd=( "${sshcmd[@]}" -t access@xe -- "${user:+$user@}${addr}${port:+:$port}%${via#xe:}" ) ;;
     ssh,xe) cmd=( "${sshcmd[@]}" -t access@xe -- "${user:+$user@}${addr}${port:+:$port}" ) ;;
     ssh,ssh:*) cmd=( "${sshcmd[@]}" -J "${via#ssh:}" "${args[@]}" ${port:+-p "$port"} "$addr" ) ;;
+    ssh,sshchain:*) cmd=( "${sshcmd[@]}" -t "${via#sshchain:}" -- ssh "${args[@]}" ${port:+-p "$port"} "$addr" ) ;;
     ssh,*) cmd=( "${sshcmd[@]}" "${args[@]}" ${port:+-p "$port"} "$addr" ) ;;
     *) fatal "Unsupported program '$REALPROG'" ;;
 esac
