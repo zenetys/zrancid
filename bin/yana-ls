@@ -51,7 +51,7 @@ shopt -u extglob
 
 function _curl() {
     # YANA_CURL_OPTIONS is not an array as it may come from the environment
-    declare "yana_curl_options=( $YANA_CURL_OPTIONS )"
+    declare -a "yana_curl_options=( $YANA_CURL_OPTIONS )"
     curl --connect-timeout "$TIMEOUT" -f -sS "${yana_curl_options[@]}" "$@"
 }
 
