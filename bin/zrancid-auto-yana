@@ -163,7 +163,7 @@ function get_rancid_type() {
         *ciscosb*) REPLY=z-cisco-sb; return 0 ;;
         *cisco\ sg*) REPLY=z-cisco-sb; return 0 ;;
         *cisco\ sf*) REPLY=z-cisco-sb; return 0 ;;
-        *cisco*) REPLY=cisco; return 0 ;;
+        *cisco*) REPLY=z-cisco-ios; return 0 ;;
         *hpetherswitch*) REPLY=hp; return 0 ;;
         *hpnetworking*) REPLY=hp; return 0 ;;
         *hpswitch*) REPLY=hp; return 0 ;;
