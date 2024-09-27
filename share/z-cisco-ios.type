@@ -57,17 +57,17 @@ z-cisco-ios;command;ios::ShowActivationKey;show activation-key;ASA/PIX
 #z-cisco-ios;command;ios::DirSlotN;dir /all sec-disk1:
 #z-cisco-ios;command;ios::DirSlotN;dir /all sec-slot2:
 #z-cisco-ios;command;ios::DirSlotN;dir /all sec-disk2:
-z-cisco-ios;command;ios::ShowContAll;show controllers
-z-cisco-ios;command;ios::ShowContCbus;show controllers cbus
-z-cisco-ios;command;ios::ShowDiagbus;show diagbus
-z-cisco-ios;command;ios::ShowDiag;show diag
+#z-cisco-ios;command;ios::ShowContAll;show controllers
+#z-cisco-ios;command;ios::ShowContCbus;show controllers cbus
+#z-cisco-ios;command;ios::ShowDiagbus;show diagbus
+#z-cisco-ios;command;ios::ShowDiag;show diag
 z-cisco-ios;command;ios::ShowCapture;show capture;ASA/PIX
 z-cisco-ios;command;ios::ShowModule;show module switch;c6500 ios vss
 z-cisco-ios;command;ios::ShowModule;show module;c6500 ios
 z-cisco-ios;command;ios::ShowSpeVersion;show spe version
 z-cisco-ios;command;ios::ShowC7200;show c7200
-z-cisco-ios;command;ios::ShowCellular;show cellular 0 profile;Cellular modem
-z-cisco-ios;command;ios::ShowHWProgrammable;show hw-programmable all
+#z-cisco-ios;command;ios::ShowCellular;show cellular 0 profile;Cellular modem
+#z-cisco-ios;command;ios::ShowHWProgrammable;show hw-programmable all
 z-cisco-ios;command;ios::ShowInventory;show inventory raw
 z-cisco-ios;command;ios::ShowInventory;show inventory;ASA/PIX
 z-cisco-ios;command;ios::ShowVTP;show vtp status
@@ -79,8 +79,8 @@ z-cisco-ios;command;ios::ShowDetail;show switch detail
 z-cisco-ios;command;ios::ShowSDM;show sdm prefer
 z-cisco-ios;command;ios::ShowMTU;show system mtu
 z-cisco-ios;command;ios::ShowDebug;show debug
-z-cisco-ios;command;ios::ShowShun;show shun;ASA/PIX
-z-cisco-ios;command;ios::WriteTerm;more system:running-config;ASA/PIX
-z-cisco-ios;command;ios::WriteTerm;show running-config view full;workaround for role-based CLI
+#z-cisco-ios;command;ios::ShowShun;show shun;ASA/PIX
+#z-cisco-ios;command;ios::WriteTerm;more system:running-config;ASA/PIX
+#z-cisco-ios;command;ios::WriteTerm;show running-config view full;workaround for role-based CLI
 z-cisco-ios;command;ios::WriteTerm;show running-config
-z-cisco-ios;command;ios::WriteTerm;write term
+#z-cisco-ios;command;ios::WriteTerm;write term
