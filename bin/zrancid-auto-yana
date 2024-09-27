@@ -154,6 +154,7 @@ function get_rancid_type() {
         *aruba\ jl*/*switch*) REPLY=z-arubaos-cx; return 0 ;;
         *aruba*/*wlan*) REPLY=z-aruba-ap; return 0 ;;
         *comware*/*) REPLY=z-cmw; return 0 ;;
+        *catalyst\ 1200\ series*/*cisco*) REPLY=z-cisco-sb; return 0 ;;
     esac
     case "${vendor,,}" in
         routerboard.com) REPLY=routeros; return 0 ;;
@@ -163,10 +164,12 @@ function get_rancid_type() {
         *ciscosb*) REPLY=z-cisco-sb; return 0 ;;
         *cisco\ sg*) REPLY=z-cisco-sb; return 0 ;;
         *cisco\ sf*) REPLY=z-cisco-sb; return 0 ;;
+        *cisco\ c1200*) REPLY=z-cisco-sb; return 0 ;;
         *cisco*) REPLY=z-cisco-ios; return 0 ;;
         *hpetherswitch*) REPLY=hp; return 0 ;;
         *hpnetworking*) REPLY=hp; return 0 ;;
         *hpswitch*) REPLY=hp; return 0 ;;
+        *huawei\ yunshan\ os*) REPLY=z-huawei; return 0 ;;
     esac
     case "${descr,,}" in
         *aruba*) REPLY=hp; return 0 ;;
@@ -177,7 +180,7 @@ function get_rancid_type() {
         hp\ j*) REPLY=hp; return 0 ;;
         huawei\ switch*) REPLY=z-huawei; return 0 ;;
         huawei\ versatile\ routing\ platform*) REPLY=z-huawei; return 0 ;;
-        huawei\ yunshan\ os) REPLY=z-huawei; return 0 ;;
+        huawei\ yunshan\ os*) REPLY=z-huawei; return 0 ;;
         *planet\ *switch) REPLY=z-cisco-sb; return 0 ;;
         *procurve*) REPLY=hp; return 0 ;;
     esac
