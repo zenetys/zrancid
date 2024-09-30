@@ -12,7 +12,7 @@ z-cisco-ios;inloop;zrancid::inloop
 z-cisco-ios;command;ios::ShowVersion;show version
 z-cisco-ios;command;ios::ShowRedundancy;show redundancy secondary
 z-cisco-ios;command;ios::ShowIDprom;show idprom backplane
-z-cisco-ios;command;ios::ShowInstallActive;show install active
+#z-cisco-ios;command;ios::ShowInstallActive;show install active
 z-cisco-ios;command;ios::ShowEnv;show env all
 z-cisco-ios;command;ios::ShowRSP;show rsp chassis-info
 z-cisco-ios;command;ios::ShowGSR;show gsr chassis
