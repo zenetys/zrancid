@@ -16,6 +16,7 @@ our %options = (
     'config_end_mark' => 'end|exit',
     'config_end_on_prompt' => 0, # set to 1 if there is no end mark
     'prefix' => '',
+    'skip_until' => undef,
 );
 
 sub _dstrip {
@@ -77,6 +78,7 @@ sub _generic {
 
     my $indent;
     my $tell, $tell_prev;
+    my $skipping_until = defined($_options{skip_until}) ? 1 : undef;
 
     while (<$INPUT>) {
         $tell_prev = $tell;
@@ -106,6 +108,12 @@ sub _generic {
         }
 
         next if _dels($_, $_options{dels});
+
+        if (defined($skipping_until)) {
+            $skipping_until = 0 if ($skipping_until && /$_options{skip_until}/);
+            next if ($skipping_until);
+        }
+
         $output = _subs($_, $_options{subs});
         print($OUTPUT $_options{prefix}.$output);
     }
