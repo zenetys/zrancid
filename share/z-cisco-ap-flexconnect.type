@@ -1,0 +1,15 @@
+# z-cisco-ap-flexconnect
+#
+# Works on Cisco AP C9000 managed via FlexConnect controller.
+# Note that "show run" only outputs a list of feature/status pairs.
+
+z-cisco-ap-flexconnect;script;rancid -t z-cisco-ap-flexconnect
+z-cisco-ap-flexconnect;login;clogin
+z-cisco-ap-flexconnect;module;zrancid
+z-cisco-ap-flexconnect;module;zrancid_cisco_ap_flexconnect
+z-cisco-ap-flexconnect;inloop;zrancid::inloop
+z-cisco-ap-flexconnect;command;zrancid::comment;show version
+z-cisco-ap-flexconnect;command;zrancid::comment;show flexconnect status
+z-cisco-ap-flexconnect;command;zrancid::comment;show flexconnect wlan
+z-cisco-ap-flexconnect;command;zrancid::comment;show flexconnect wlan vlan
+z-cisco-ap-flexconnect;command;zrancid::config;show running-config
