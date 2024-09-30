@@ -159,7 +159,7 @@ function zrancid-replay() {
     fi
     (   set -f
         set -- $script # yup...
-        prun "$@" -d -f "${ARGS[2]}" "${DEVICES[i]}" )
+        prun "$@" -d -f "${ARGS[2]}" "${DEVICES[0]}" )
 }
 
 function zrancid-login() {
