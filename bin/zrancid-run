@@ -103,19 +103,27 @@ function generate_cloginrc() {
 }
 
 function zrancid-run() {
+    local ret=0
     local cmd=(
         rancid-run
         -f "$ZRANCID_ETC_DIR/rancid.conf"
         -c "Updates from RANCiD run on $(date +%Y-%m-%dT%H:%M:%S%:z)"
     )
     if [[ ${ARGS[1]} == '@all' ]]; then
-        prun "${cmd[@]}"
+        if ! prun "${cmd[@]}"; then
+            error "${ARGS[1]}: rancid-run failed"
+            ret=1
+        fi
     else
         for (( i = 0; i < ${#DEVICES[@]}; i++ )); do
             info "DEVICE: ${DEVICES[i]}"
-            prun "${cmd[@]}" -r "${DEVICES[i]}"
+            if ! prun "${cmd[@]}" -r "${DEVICES[i]}"; then
+                error "${DEVICES[i]}: rancid-run failed"
+                ret=1
+            fi
         done
     fi
+    return "$ret"
 }
 
 function _zrancid_debug_device() {
