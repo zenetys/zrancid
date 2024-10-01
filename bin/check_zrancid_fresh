@@ -68,13 +68,6 @@ declare -A output_detail=(
     [too_small]=
 )
 
-data=$(zrancid-ls -e "$entity")
-ret=$?
-if (( ret != 0 )); then
-    echo "UNKNOWN: Command zrancid-ls failed status $ret"
-    exit 3
-fi
-
 # $1: key
 # $2: total key count
 # $3: device to add to verbose output
@@ -85,6 +78,14 @@ function add_output_detail() {
 }
 
 while read -r device last size; do
+    if [[ $device == \#pipestatus:* ]]; then
+        if (( ${device##*:} != 0 )); then
+            echo 'UNKNOWN: Failed to get data'
+            exit 3
+        fi
+        break
+    fi
+
     fresh=1
     if [[ -n ${crit[too_old]} ]] && (( now - last > crit[too_old] )); then
         worsen_status "$state" "2"; state=$REPLY
@@ -104,7 +105,12 @@ while read -r device last size; do
         long_output+=( "$device: too small (crit)" )
     fi
     (( perf[fresh]+=fresh ))
-done < <(zrancid-ls -e "$entity")
+
+done < <(
+    # avoid temporary file, here-string included
+    zrancid-ls -e "$entity"
+    echo "#pipestatus:$?"
+)
 
 output=
 perfdata=
