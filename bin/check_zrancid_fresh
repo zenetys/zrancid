@@ -110,8 +110,9 @@ output=
 perfdata=
 for k in "${!perf[@]}"; do
     [[ (-n ${warn[$k]} || -n ${crit[$k]}) && ${perf[$k]} != 0 ]] && e='**' || e=
-    output+="${output:+, }${e}${k}=${perf[$k]}${e}"
-    (( max_output_detail > 0 )) && output+="${output_detail[$k]:+ (${output_detail[$k]})}"
+    current="${e}${k}=${perf[$k]}${e}"
+    (( max_output_detail > 0 )) && current+="${output_detail[$k]:+ (${output_detail[$k]})}"
+    [[ -n $e ]] && output="${current}${output:+, }${output}" || output+="${output:+, }${current}"
     perfdata+="${perfdata:+ }'$k'=${perf[$k]};${warn[$k]};${crit[$k]}"
 done
 
