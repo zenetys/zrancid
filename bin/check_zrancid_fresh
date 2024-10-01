@@ -69,16 +69,14 @@ fi
 
 while read -r device last size; do
     fresh=1
-    if [[ -n ${crit[too_old]} ]]; then
-        if (( now - last > crit[too_old] )); then
-            worsen_status "$state" "2"; state=$REPLY
-            (( perf[too_old]++, fresh=0 ))
-            long_output+=( "$device: too old (crit)" )
-        elif (( now - last > warn[too_old] )); then
-            worsen_status "$state" "1"; state=$REPLY
-            (( perf[too_old]++, fresh=0 ))
-            long_output+=( "$device: too old (warn)" )
-        fi
+    if [[ -n ${crit[too_old]} ]] && (( now - last > crit[too_old] )); then
+        worsen_status "$state" "2"; state=$REPLY
+        (( perf[too_old]++, fresh=0 ))
+        long_output+=( "$device: too old (crit)" )
+    elif [[ -n ${warn[too_old]} ]] && (( now - last > warn[too_old] )); then
+        worsen_status "$state" "1"; state=$REPLY
+        (( perf[too_old]++, fresh=0 ))
+        long_output+=( "$device: too old (warn)" )
     fi
     if [[ -n ${crit[too_small]} ]] && (( size < crit[too_small] )); then
         worsen_status "$state" "2"; state=$REPLY
