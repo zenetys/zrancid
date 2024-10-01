@@ -54,6 +54,7 @@ while (( $# > 0 )); do
 done
 
 [[ -z $entity ]] && nagios_exit_usage
+for i in "${warn[@]}" "${crit[@]}"; do [[ -n ${i//[0-9]} ]] && nagios_exit_usage; done
 
 now=$(date +%s)
 state=0
