@@ -13,6 +13,8 @@ Options:
   -c, --critical SECONDS            Critical threshold in seconds
   -s, --min-size BYTES              File size in bytes
   -mod, --max-output-detail NUM     Add error devices to output
+  -u, --url                         Get data via HTTP api
+  -t, --timeout                     Timeout when --url is used
   -h, --help                        Display this help
 "
     exit 3
@@ -43,6 +45,8 @@ declare -A perf=(
 declare -A warn=()
 declare -A crit=()
 max_output_detail=0
+url=
+timeout=5
 
 while (( $# > 0 )); do
     case "$1" in
@@ -51,6 +55,8 @@ while (( $# > 0 )); do
         -c|--critical) crit[too_old]=$2; shift ;;
         -s|--min-size) crit[too_small]=$2; shift ;;
         -mod|--max-output-detail) max_output_detail=$2; shift ;;
+        -u|--url) url=$2; shift ;;
+        -t|--timeout) timeout=$2; shift ;;
         *) nagios_exit_usage ;;
     esac
     shift
@@ -59,6 +65,7 @@ done
 [[ -z $entity ]] && nagios_exit_usage
 for i in "${warn[@]}" "${crit[@]}"; do [[ -n ${i//[0-9]} ]] && nagios_exit_usage; done
 [[ -n ${max_output_detail//[0-9]} ]] && nagios_exit_usage
+[[ -n ${timeout//[0-9]} ]] && nagios_exit_usage
 
 now=$(date +%s)
 state=0
@@ -108,7 +115,11 @@ while read -r device last size; do
 
 done < <(
     # avoid temporary file, here-string included
-    zrancid-ls -e "$entity"
+    if [[ -z $url ]]; then
+        zrancid-ls -e "$entity"
+    else
+        curl -kfsS -m "$timeout" --get --data-urlencode "entity=$entity" "$url"
+    fi
     echo "#pipestatus:$?"
 )
 
