@@ -9,8 +9,8 @@ Nagios plugin to check for (z)RANCiD backup freshness
 
 Options:
   -e, --entity NAME         Entity name
-  -w, --WARNING SECONDS     Warning threshold in seconds
-  -c, --CRITICAL SECONDS    Critical threshold in seconds
+  -w, --warning SECONDS     Warning threshold in seconds
+  -c, --critical SECONDS    Critical threshold in seconds
   -s, --min-size BYTES      File size in bytes
   -h, --help                Display this help
 "
