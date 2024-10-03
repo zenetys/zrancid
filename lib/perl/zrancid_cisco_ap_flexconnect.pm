@@ -11,6 +11,7 @@ $zrancid::options{commands}{'show version'}{prefix} = "${C}Version: ";
 $zrancid::options{commands}{'show version'}{skip_until} = 'Cisco AP Software';
 $zrancid::options{commands}{'show version'}{subs} = [
     [ '(?i:(uptime is\s+))[0-9].*', '$1<removed>' ],
+    [ '(?i:(with [0-9]+/)[0-9]+(K bytes of memory))', '$1<removed>$2' ],
 ];
 $zrancid::options{commands}{'show flexconnect status'}{prefix} = "${C}FlexConnect: ";
 $zrancid::options{commands}{'show flexconnect wlan'}{prefix} = "${C}FlexConnect: ";
