@@ -41,6 +41,7 @@ declare -A perf=(
     [fresh]=0
     [too_old]=0
     [too_small]=0
+    [disabled]=0
 )
 declare -A warn=()
 declare -A crit=()
@@ -67,6 +68,11 @@ for i in "${warn[@]}" "${crit[@]}"; do [[ -n ${i//[0-9]} ]] && nagios_exit_usage
 [[ -n ${max_output_detail//[0-9]} ]] && nagios_exit_usage
 [[ -n ${timeout//[0-9]} ]] && nagios_exit_usage
 
+if [[ -n $url ]]; then
+    [[ $url == *\?* ]] && url+='&' || url+='?'
+    url+='verbose=3'
+fi
+
 now=$(date +%s)
 state=0
 long_output=()
@@ -84,13 +90,23 @@ function add_output_detail() {
     output_detail[$1]+="${output_detail[$1]:+, }${3%.*}"
 }
 
-while read -r device last size; do
+ignore_re='\<alert=0\>'
+while read -r device last size type updown comment; do
     if [[ $device == \#pipestatus:* ]]; then
         if (( ${device##*:} != 0 )); then
             echo 'UNKNOWN: Failed to get data'
             exit 3
         fi
         break
+    fi
+
+    if [[ $updown != up ]]; then
+        (( perf[disabled]+=1 ))
+        continue
+    fi
+    if [[ $comment =~ $ignore_re ]]; then
+        (( perf[disabled]+=1 ))
+        continue
     fi
 
     fresh=1
@@ -116,7 +132,7 @@ while read -r device last size; do
 done < <(
     # avoid temporary file, here-string included
     if [[ -z $url ]]; then
-        zrancid-ls -e "$entity"
+        zrancid-ls -e "$entity" -vvv
     else
         curl -kfsS -m "$timeout" --get --data-urlencode "entity=$entity" "$url"
     fi
