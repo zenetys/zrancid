@@ -22,13 +22,13 @@ z-cisco-nx;command;nxos::ShowEnv;show environment fex all fan
 z-cisco-nx;command;nxos::ShowEnvTemp;show environment temperature
 z-cisco-nx;command;nxos::ShowEnvPower;show environment power
 z-cisco-nx;command;nxos::ShowBoot;show boot
-z-cisco-nx;command;nxos::DirSlotN;dir bootflash:
-z-cisco-nx;command;nxos::DirSlotN;dir debug:
-z-cisco-nx;command;nxos::DirSlotN;dir logflash:
-z-cisco-nx;command;nxos::DirSlotN;dir slot0:
-z-cisco-nx;command;nxos::DirSlotN;dir usb1:
-z-cisco-nx;command;nxos::DirSlotN;dir usb2:
-z-cisco-nx;command;nxos::DirSlotN;dir volatile:
+#z-cisco-nx;command;nxos::DirSlotN;dir bootflash:
+#z-cisco-nx;command;nxos::DirSlotN;dir debug:
+#z-cisco-nx;command;nxos::DirSlotN;dir logflash:
+#z-cisco-nx;command;nxos::DirSlotN;dir slot0:
+#z-cisco-nx;command;nxos::DirSlotN;dir usb1:
+#z-cisco-nx;command;nxos::DirSlotN;dir usb2:
+#z-cisco-nx;command;nxos::DirSlotN;dir volatile:
 z-cisco-nx;command;nxos::ShowModule;show module
 z-cisco-nx;command;nxos::ShowModule;show module xbar
 #z-cisco-nx;command;nxos::ShowModule;show module X;add, but wait for show all
