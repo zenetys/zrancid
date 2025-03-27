@@ -11,7 +11,7 @@ function info() { echo "INFO: $PROGNAME: $*" >&2; }
 [[ -z $ZRANCID_ETC_DIR ]] && fatal 'Bad env! ZRANCID_ETC_DIR not set'
 [[ -z $BASEDIR ]] && fatal 'Bad env! rancid BASEDIR not set'
 
-GROUP=default
+GROUP=${ZRANCID_GROUP:-default}
 
 function exit_usage() {
     local status=${1:-0}

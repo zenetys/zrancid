@@ -3,5 +3,5 @@ source "${0%/*}/../lib/zrancid.env" || exit 2
 PROGNAME=${0##*/}
 function fatal() { echo "FATAL: $PROGNAME: $*" >&2; exit 2; }
 [[ -z $BASEDIR ]] && fatal 'Bad env! rancid BASEDIR not set'
-GROUP=default
+GROUP=${ZRANCID_GROUP:-default}
 cd "$BASEDIR/$GROUP" && exec tig

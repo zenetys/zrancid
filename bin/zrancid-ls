@@ -8,7 +8,7 @@ set -f
 export LC_ALL=C
 
 BASEDIR=${RANCID_BASEDIR:-$BASEDIR} # checked after fatal() is defined
-GROUP=default
+GROUP=${ZRANCID_GROUP:-default}
 
 SEPARATOR=$'\t'
 FILTER=() # or'ed patterns
