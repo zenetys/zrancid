@@ -169,6 +169,8 @@ function get_rancid_type() {
         *hpetherswitch*) REPLY=hp; return 0 ;;
         *hpnetworking*) REPLY=hp; return 0 ;;
         *hpswitch*) REPLY=hp; return 0 ;;
+        *huawei\ switch*) REPLY=z-huawei; return 0 ;;
+        *huawei\ versatile\ routing\ platform*) REPLY=z-huawei; return 0 ;;
         *huawei\ yunshan\ os*) REPLY=z-huawei; return 0 ;;
     esac
     case "${descr,,}" in
@@ -179,9 +181,9 @@ function get_rancid_type() {
         *cisco\ nx-os*) REPLY=z-cisco-nx; return 0 ;;
         *cisco\ nexus*) REPLY=z-cisco-nx; return 0 ;;
         hp\ j*) REPLY=hp; return 0 ;;
-        huawei\ switch*) REPLY=z-huawei; return 0 ;;
-        huawei\ versatile\ routing\ platform*) REPLY=z-huawei; return 0 ;;
-        huawei\ yunshan\ os*) REPLY=z-huawei; return 0 ;;
+        *huawei\ switch*) REPLY=z-huawei; return 0 ;;
+        *huawei\ versatile\ routing\ platform*) REPLY=z-huawei; return 0 ;;
+        *huawei\ yunshan\ os*) REPLY=z-huawei; return 0 ;;
         *planet\ *switch) REPLY=z-cisco-sb; return 0 ;;
         *procurve*) REPLY=hp; return 0 ;;
     esac
