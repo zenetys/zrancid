@@ -1,9 +1,24 @@
 #!/bin/bash
 PROGNAME=${0##*/}
-function speak() { echo "$HOSTNAME> $PROGNAME: $*"; }
+# NB: on stderr, not stdout: ttyd merges both on the pty anyway, and
+# zrancid-collect (see below) must get a clean stdout with only the
+# config file on it.
+function speak() { echo "$HOSTNAME> $PROGNAME: $*" >&2; }
 function die() { speak "$*"; exit 2; }
 speak 'Hello!'
 speak "SSH_ORIGINAL_COMMAND = $SSH_ORIGINAL_COMMAND"
 [[ -z $SSH_ORIGINAL_COMMAND ]] && die 'Bad env! Bye.'
+
+# yana: on-demand RANCiD collection, requested as "collect <name>"; any
+# other request keeps today's behaviour below (a single name opens a
+# login shell via zrancid-login). <name> is restricted to the same
+# charset in both cases.
+if [[ $SSH_ORIGINAL_COMMAND == 'collect '* ]]; then
+    NAME=${SSH_ORIGINAL_COMMAND#collect }
+    [[ -z $NAME ]] && die 'Invalid value!'
+    [[ -n "${NAME//[[:alnum:]._-]}" ]] && die 'Invalid value!'
+    exec zrancid-collect "$NAME"
+fi
+
 [[ -n "${SSH_ORIGINAL_COMMAND//[[:alnum:]._-]}" ]] && die 'Invalid value!'
 exec zrancid-login "$SSH_ORIGINAL_COMMAND"

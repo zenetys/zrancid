@@ -14,6 +14,8 @@ function warning() { echo "WARNING: $PROGNAME: $*" >&2; }
 [[ -z $ZRANCID_ETC_DIR ]] && fatal 'Bad env! ZRANCID_ETC_DIR not set'
 [[ -z $TMPDIR ]] && fatal 'Bad env! rancid TMPDIR not set'
 
+GROUP=${ZRANCID_GROUP:-default} # used by zrancid-collect only
+
 # instance specific
 OUR_TMP_DIR="$TMPDIR/$PROGNAME.$RANDOM.$RANDOM"
 trap '[[ -d $OUR_TMP_DIR && -z $KEEP_OUR_TMP_DIR ]] && {
@@ -55,6 +57,17 @@ Commands:
         Call plogin. It opens a shell to the device. If a pattern is
         given for the device argument, the first matching device is
         used as target.
+
+  collect device-name
+        Trigger a real RANCiD collection for exactly this device (the
+        name is matched exactly, not as a pattern: unlike the other
+        commands here, a dot in device-name is NOT a regex wildcard)
+        and print the resulting config file on stdout, nothing else.
+        Meant to be called from an SSH forced command so yana can
+        request an on-demand collection. Exit status: 0 collected; 3
+        device not registered in RANCiD; 4 rancid-run ran but did not
+        refresh the config file (unreachable device, parser failure,
+        or the group's rancid-run lock held by another run).
 
   exec device-regex-pattern commands
         Call plogin to connect to the matching devices and executes the
@@ -174,6 +187,35 @@ function zrancid-login() {
     prun plogin -z "${TYPES[0]}" "${DEVICES[0]}"
 }
 
+function zrancid-collect() {
+    local device=${DEVICES[0]}
+    local file="$BASEDIR/$GROUP/configs/$device"
+    local mtime_before= mtime_after=
+    local cmd=(
+        rancid-run
+        -f "$ZRANCID_ETC_DIR/rancid.conf"
+        -c "On-demand collection via yana on $(date +%Y-%m-%dT%H:%M:%S%:z)"
+    )
+
+    [[ -e $file ]] && mtime_before=$(stat -c '%Y' "$file")
+
+    info "DEVICE: $device"
+    prun "${cmd[@]}" -r "$device" || error "$device: rancid-run failed"
+
+    if [[ ! -e $file ]]; then
+        error "$device: config file not found after collection: $file"
+        return 4
+    fi
+
+    mtime_after=$(stat -c '%Y' "$file")
+    if [[ -n $mtime_before && $mtime_before == "$mtime_after" ]]; then
+        error "$device: config file not refreshed (unreachable device, parser failure, or the group lock held by another run)"
+        return 4
+    fi
+
+    cat "$file"
+}
+
 function zrancid-exec() {
     [[ -n ${ARGS[2]} ]] || exit_usage 1
     for (( i = 0; i < ${#DEVICES[@]}; i++ )); do
@@ -227,11 +269,30 @@ declare -F -f "zrancid-${ARGS[0]}" > /dev/null || exit_usage 1
 
 DEVICES=()
 TYPES=()
+LS_PATTERN=${ARGS[1]}
+if [[ ${ARGS[0]} == collect ]]; then
+    # collect requires an EXACT device name, not a pattern: zrancid-ls
+    # applies an unanchored regex ("[[ $device =~ $i ]]", see
+    # bin/zrancid-ls), so eg. name "sw1.demo" would also match
+    # "sw1xdemo". Anchor the pattern and escape the only regex
+    # metacharacter allowed in the name charset (the dot).
+    LS_PATTERN="^${ARGS[1]//./\\.}\$"
+fi
 while IFS=$'\x16' read -r device x y type; do
     DEVICES+=( "$device" )
     TYPES+=( "$type" )
-done < <(zrancid-ls -s $'\x16' -v -- "${ARGS[1]}")
-(( ${#DEVICES[@]} > 0 )) || fatal 'Device(s) not found!'
+done < <(zrancid-ls -s $'\x16' -v -- "$LS_PATTERN")
+
+if [[ ${ARGS[0]} == collect ]]; then
+    # belt and suspenders: the anchored pattern above should already
+    # guarantee a single exact match, double check it really is one.
+    if (( ${#DEVICES[@]} != 1 )) || [[ ${DEVICES[0]} != "${ARGS[1]}" ]]; then
+        error "${ARGS[1]}: device not registered in RANCiD"
+        exit 3
+    fi
+else
+    (( ${#DEVICES[@]} > 0 )) || fatal 'Device(s) not found!'
+fi
 
 # make sure we have a tmpdir
 mkdir -p "$OUR_TMP_DIR" || fatal 'Failed to create tmpdir'
