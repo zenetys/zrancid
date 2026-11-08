@@ -186,3 +186,22 @@ If you just want to disable email notifications, you can set the SENDMAIL variab
 ```
 rancid>  echo 'export SENDMAIL=/bin/true' >> ~/etc/rancid.conf
 ```
+
+### yana: on-demand collection
+
+yana (a network inventory application) can trigger a real RANCiD collection for a single device over SSH, through a server whose sshd uses a forced command (see doc/60-ttyd-integration.md for the general idea, there used for zrancid-login).
+
+The sample forced command `share/ttyd-ssh-command.sample` recognizes the SSH request string `collect <name>` and runs `zrancid-collect <name>`; any other request keeps the existing behaviour (a single `<name>` opens a login shell via `zrancid-login`). `<name>` is restricted to `[[:alnum:]._-]` in both cases.
+
+`zrancid-collect <name>` requires an EXACT device name. This is unlike the other zrancid commands, which accept an unanchored regex pattern (see `bin/zrancid-ls`, `[[ $device =~ $i ]]`), where a dot in the name is a regex wildcard; `zrancid-collect` anchors and escapes the name before matching, and double-checks the matched device equals the requested name. It calls `rancid-run -r <name>` (the same invocation `zrancid-run` makes) and, on success, prints the resulting config file (`$BASEDIR/$GROUP/configs/<name>`) on stdout, and nothing else; every log line (ours and rancid-run's own output) goes to stderr.
+
+Exit status:
+
+* `0` — collected, the config is on stdout.
+* `3` — the device is not registered in RANCiD (router.db).
+* `4` — rancid-run ran but did not refresh the config file: unreachable device, parser failure, or rancid-run's own per-group lock held by another run.
+* `2` — environment or usage error (eg. a malformed `SSH_ORIGINAL_COMMAND`, missing zrancid environment).
+
+**Lock caveat:** rancid-run serializes itself per group with a non-blocking lock file (`$TMPDIR/.$GROUP.run.lock`, see `control_rancid`/`rancid-run` source). If the lock is already held, rancid-run does **not** wait: it logs "lockfile exists" for that invocation and leaves `configs/<name>` untouched, which `zrancid-collect` reports as exit `4`. yana must serialize its `collect` requests against a given RANCiD server (eg. one in flight at a time, or a short retry), otherwise a collection requested while another one is running will come back as "not refreshed" rather than being queued.
+
+The forced command sample needs to be (re)deployed to the real RANCiD server to enable this.
