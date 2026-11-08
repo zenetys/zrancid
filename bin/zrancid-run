@@ -200,7 +200,8 @@ function zrancid-collect() {
     [[ -e $file ]] && mtime_before=$(stat -c '%Y' "$file")
 
     info "DEVICE: $device"
-    prun "${cmd[@]}" -r "$device" || error "$device: rancid-run failed"
+    # stdout carries the config only: rancid-run output goes to stderr
+    prun "${cmd[@]}" -r "$device" >&2 || error "$device: rancid-run failed"
 
     if [[ ! -e $file ]]; then
         error "$device: config file not found after collection: $file"
